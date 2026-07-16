@@ -4,20 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import {
-  Trophy,
   Swords,
   Calendar,
   Radio,
   Menu,
   X,
   Shield,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navLinks = [
-  { href: "/", label: "Home", icon: Trophy },
+  { href: "/", label: "Home", icon: Home },
   { href: "/bracket", label: "Bracket", icon: Swords },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/current-match", label: "Live", icon: Radio },
@@ -37,9 +38,14 @@ export function Navbar() {
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25">
-              <Trophy className="h-5 w-5 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Neosoul Logo"
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-xl object-contain"
+              priority
+            />
             <span className="text-lg font-bold text-white hidden sm:block">
               Neosoul
             </span>

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
-  Trophy,
   Swords,
   Calendar,
   Radio,
@@ -217,7 +217,13 @@ export default function HomePage() {
             <div className="relative overflow-hidden rounded-[20px] border border-white/[0.08] bg-gradient-to-br from-orange-500/10 via-[#09090B] to-[#09090B] p-8 sm:p-12">
               <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl" />
               <div className="relative z-10 text-center">
-                <Trophy className="h-16 w-16 text-orange-400 mx-auto mb-6" />
+                <Image
+                  src="/logo.png"
+                  alt="Neosoul Logo"
+                  width={80}
+                  height={80}
+                  className="h-16 w-16 mx-auto mb-6 rounded-2xl object-contain"
+                />
                 <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
                   Championship Arena
                 </h2>

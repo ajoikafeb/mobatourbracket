@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Swords,
@@ -13,7 +14,6 @@ import {
   LogOut,
   Menu,
   X,
-  Trophy,
   ChevronLeft,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -51,8 +51,8 @@ export default function AdminLayout({
     <div className="min-h-screen bg-[#09090B] flex">
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-white/[0.08] bg-[#09090B]">
         <div className="flex h-16 items-center gap-3 px-6 border-b border-white/[0.08]">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600">
-            <Trophy className="h-4 w-4 text-white" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl overflow-hidden">
+            <Image src="/logo.png" alt="Neosoul" width={32} height={32} className="h-8 w-8 object-contain" />
           </div>
           <span className="text-sm font-bold text-white">Admin Panel</span>
         </div>
@@ -107,7 +107,7 @@ export default function AdminLayout({
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <div className="flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-orange-400" />
+              <Image src="/logo.png" alt="Neosoul" width={20} height={20} className="h-5 w-5 rounded object-contain" />
               <span className="text-sm font-bold text-white">Admin</span>
             </div>
           </div>

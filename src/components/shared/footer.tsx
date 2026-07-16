@@ -1,6 +1,6 @@
 "use client";
 
-import { Trophy } from "lucide-react";
+import Image from "next/image";
 import { useSettings } from "@/hooks/use-settings";
 
 export function Footer() {
@@ -11,9 +11,13 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col items-center gap-6 text-center">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600">
-              <Trophy className="h-4 w-4 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Neosoul Logo"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-xl object-contain"
+            />
             <span className="text-lg font-bold text-white">
               {settings?.tournament_name || "Neosoul"}
             </span>
