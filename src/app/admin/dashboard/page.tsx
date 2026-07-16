@@ -285,7 +285,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <ProgressBar percentage={roundProgress.percentage} />
 
-                  {isRoundComplete && canProceedToNextRound && (
+                  {canProceedToNextRound && (
                     <div className="flex items-center gap-2 text-sm text-green-400">
                       <CheckCircle2 className="h-4 w-4" />
                       Round complete — ready for next round!
@@ -323,7 +323,7 @@ export default function AdminDashboardPage() {
                 </Button>
               )}
 
-              {tournamentState === "running" && isRoundComplete && canProceedToNextRound && (
+              {tournamentState === "running" && canProceedToNextRound && (
                 <Button
                   onClick={doProceedToNextRound}
                   disabled={actionLoading}
@@ -334,7 +334,7 @@ export default function AdminDashboardPage() {
                 </Button>
               )}
 
-              {tournamentState === "running" && isRoundComplete && canFinishTournament && (
+              {tournamentState === "running" && canFinishTournament && (
                 <Button
                   onClick={doFinishTournament}
                   disabled={actionLoading}

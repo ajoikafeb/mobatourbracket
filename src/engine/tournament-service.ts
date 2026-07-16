@@ -109,19 +109,33 @@ export function getRoundProgress(settings: Settings, matches: Match[]): RoundPro
   };
 }
 
+export function isRoundNComplete(matches: Match[], roundOrder: number): boolean {
+  const roundMatches = getRoundMatches(matches, roundOrder);
+  return roundMatches.length > 0 && roundMatches.every((m) => m.status === "finished");
+}
+
 export function isRoundComplete(settings: Settings, matches: Match[]): boolean {
-  const progress = getRoundProgress(settings, matches);
-  return progress.total > 0 && progress.completed === progress.total;
+  const currentRound = deriveCurrentRoundOrder(matches);
+  return isRoundNComplete(matches, currentRound);
 }
 
 export function canProceedToNextRound(settings: Settings, matches: Match[]): boolean {
   const state = deriveTournamentState(settings);
   if (state !== "running") return false;
-  if (!isRoundComplete(settings, matches)) return false;
   const bracketSize = getBracketSizeFromMatches(matches);
   const totalRounds = getTotalRounds(bracketSize);
   const currentRound = deriveCurrentRoundOrder(matches);
-  return currentRound < totalRounds - 1;
+
+  if (currentRound >= totalRounds - 1) return false;
+
+  // Button shows when the round BEFORE the current round is complete
+  // (i.e. previous round done → "Start Next Round" appears to advance)
+  if (currentRound > 0) {
+    return isRoundNComplete(matches, currentRound - 1);
+  }
+
+  // First round: button shows when the first round itself is complete
+  return isRoundNComplete(matches, 0);
 }
 
 export function canFinishTournament(settings: Settings, matches: Match[]): boolean {

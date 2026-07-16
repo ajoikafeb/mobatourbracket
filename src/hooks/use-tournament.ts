@@ -146,7 +146,7 @@ export function useTournament() {
     if (!settings || !snapshot?.canProceedToNextRound) return;
     setActionLoading(true);
     try {
-      showMsg("Advanced to next round!");
+      showMsg(`Advanced to ${snapshot.currentRoundName}!`);
     } catch (err) {
       console.error("Error advancing round:", err);
       showMsg("Error advancing round.");
