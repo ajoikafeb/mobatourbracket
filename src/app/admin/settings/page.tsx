@@ -127,7 +127,7 @@ export default function AdminSettingsPage() {
               Subtitle
             </label>
             <Input
-              placeholder="Community Mobile MOBA Tournament"
+              placeholder="Indonesian Community Tournament"
               value={tournamentSubtitle}
               onChange={(e) => setTournamentSubtitle(e.target.value)}
             />

@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     template: "%s | Neosoul Tournament Tracker",
   },
   description:
-    "Community Mobile MOBA Tournament Tracker. Track brackets, schedules, and live matches.",
+    "Indonesian Community Tournament Tracker. Track brackets, schedules, and live matches.",
   keywords: [
     "tournament",
     "MOBA",
@@ -35,13 +35,13 @@ export const metadata: Metadata = {
     siteName: "Neosoul Tournament Tracker",
     title: "Neosoul Tournament Tracker",
     description:
-      "Community Mobile MOBA Tournament Tracker",
+      "Indonesian Community Tournament Tracker",
   },
   twitter: {
     card: "summary_large_image",
     title: "Neosoul Tournament Tracker",
     description:
-      "Community Mobile MOBA Tournament Tracker",
+      "Indonesian Community Tournament Tracker",
   },
   manifest: "/manifest.json",
 };

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   tournament_name TEXT NOT NULL DEFAULT 'Neosoul Tournament',
-  tournament_subtitle TEXT NOT NULL DEFAULT 'Community Mobile MOBA Tournament',
+  tournament_subtitle TEXT NOT NULL DEFAULT 'Indonesian Community Tournament',
   tournament_logo TEXT,
   tournament_banner TEXT,
   tournament_status TEXT NOT NULL DEFAULT 'upcoming' CHECK (tournament_status IN ('upcoming', 'ongoing', 'completed')),
@@ -146,5 +146,5 @@ DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE brackets; EXCEPTION WH
 
 -- Insert default settings (only if empty)
 INSERT INTO settings (tournament_name, tournament_subtitle, tournament_status, footer_text)
-SELECT 'Neosoul Tournament', 'Community Mobile MOBA Tournament', 'upcoming', 'Built for the community, by the community.'
+SELECT 'Neosoul Tournament', 'Indonesian Community Tournament', 'upcoming', 'Built for the community, by the community.'
 WHERE NOT EXISTS (SELECT 1 FROM settings LIMIT 1);

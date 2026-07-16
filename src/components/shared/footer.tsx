@@ -24,7 +24,7 @@ export function Footer() {
           </div>
           <p className="max-w-md text-sm text-zinc-500">
             {settings?.footer_text ||
-              "Community Mobile MOBA Tournament Tracker. Built for the community, by the community."}
+              "Indonesian Community Tournament Tracker. Built for the community, by the community."}
           </p>
           <div className="flex items-center gap-6 text-xs text-zinc-600">
             <span>© 2026 Neosoul Indonesia</span>
