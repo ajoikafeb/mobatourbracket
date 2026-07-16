@@ -29,7 +29,6 @@ function getTeamPlayers(bracket: BracketWithTeam, playersPerTeam?: number) {
   const team = bracket.team;
   if (!team) return [];
   const allPlayers = [
-    { role: "Captain", name: team.captain },
     { role: "Player 1", name: team.player_1 },
     { role: "Player 2", name: team.player_2 },
     { role: "Player 3", name: team.player_3 },
@@ -38,6 +37,9 @@ function getTeamPlayers(bracket: BracketWithTeam, playersPerTeam?: number) {
     { role: "Player 6", name: (team as Team & { player_6?: string }).player_6 },
     ...(team.substitute ? [{ role: "Substitute", name: team.substitute }] : []),
   ].filter((p) => p.name);
+  if (team.captain && team.captain !== team.player_1) {
+    allPlayers.unshift({ role: "Captain", name: team.captain });
+  }
   if (playersPerTeam) {
     return allPlayers.slice(0, playersPerTeam);
   }
