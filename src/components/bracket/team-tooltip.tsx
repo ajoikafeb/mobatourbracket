@@ -14,15 +14,24 @@ export function TeamTooltip({ team, rect }: TeamTooltipProps) {
 
   useEffect(() => {
     const vw = window.innerWidth;
-    const tooltipW = ref.current?.offsetWidth || 200;
+    const vh = window.innerHeight;
+    const tooltipW = ref.current?.offsetWidth || 180;
     const tooltipH = ref.current?.offsetHeight || 160;
 
-    let x = rect.right + 10;
-    let y = rect.top + rect.height / 2 - tooltipH / 2;
+    let x: number;
+    let y: number;
 
-    if (x + tooltipW > vw - 10) x = rect.left - tooltipW - 10;
-    if (y < 10) y = 10;
-    if (y + tooltipH > window.innerHeight - 10) y = window.innerHeight - tooltipH - 10;
+    if (vw < 640) {
+      x = Math.max(10, Math.min(rect.left, vw - tooltipW - 10));
+      y = rect.bottom + 8;
+      if (y + tooltipH > vh - 10) y = rect.top - tooltipH - 8;
+    } else {
+      x = rect.right + 10;
+      y = rect.top + rect.height / 2 - tooltipH / 2;
+      if (x + tooltipW > vw - 10) x = rect.left - tooltipW - 10;
+      if (y < 10) y = 10;
+      if (y + tooltipH > vh - 10) y = vh - tooltipH - 10;
+    }
 
     setPos({ x, y });
   }, [rect]);
