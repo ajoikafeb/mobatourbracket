@@ -1,0 +1,118 @@
+-- ============================================
+-- Neosoul Tournament Tracker — Database Schema
+-- ============================================
+-- Run this SQL in your Supabase SQL Editor
+-- to create the required tables.
+
+-- Teams table
+CREATE TABLE IF NOT EXISTS teams (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  team_name TEXT NOT NULL,
+  logo TEXT,
+  captain TEXT NOT NULL DEFAULT '',
+  player_1 TEXT NOT NULL DEFAULT '',
+  player_2 TEXT NOT NULL DEFAULT '',
+  player_3 TEXT NOT NULL DEFAULT '',
+  player_4 TEXT NOT NULL DEFAULT '',
+  player_5 TEXT NOT NULL DEFAULT '',
+  substitute TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Settings table (tournament configuration)
+CREATE TABLE IF NOT EXISTS settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  tournament_name TEXT NOT NULL DEFAULT 'Neosoul Tournament',
+  tournament_subtitle TEXT NOT NULL DEFAULT 'Community Mobile MOBA Tournament',
+  tournament_logo TEXT,
+  tournament_banner TEXT,
+  tournament_status TEXT NOT NULL DEFAULT 'upcoming' CHECK (tournament_status IN ('upcoming', 'ongoing', 'completed')),
+  footer_text TEXT DEFAULT 'Built for the community, by the community.',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Matches table
+CREATE TABLE IF NOT EXISTS matches (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  team_a TEXT NOT NULL DEFAULT '',
+  team_b TEXT NOT NULL DEFAULT '',
+  score_a INTEGER NOT NULL DEFAULT 0,
+  score_b INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'live', 'finished')),
+  round TEXT NOT NULL DEFAULT 'Quarter Final',
+  match_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  best_of INTEGER NOT NULL DEFAULT 3 CHECK (best_of IN (1, 3, 5)),
+  winner TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Brackets table
+CREATE TABLE IF NOT EXISTS brackets (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  round TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  team_name TEXT NOT NULL DEFAULT '',
+  team_seed INTEGER NOT NULL DEFAULT 0,
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
+  opponent_id UUID,
+  match_id UUID REFERENCES matches(id) ON DELETE SET NULL,
+  is_winner BOOLEAN NOT NULL DEFAULT FALSE,
+  is_current BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(round, position)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status);
+CREATE INDEX IF NOT EXISTS idx_matches_date ON matches(match_date);
+CREATE INDEX IF NOT EXISTS idx_brackets_round ON brackets(round);
+CREATE INDEX IF NOT EXISTS idx_brackets_position ON brackets(position);
+CREATE INDEX IF NOT EXISTS idx_brackets_team_id ON brackets(team_id);
+CREATE INDEX IF NOT EXISTS idx_teams_team_name ON teams(team_name);
+
+-- RLS Policies
+ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE brackets ENABLE ROW LEVEL SECURITY;
+
+-- Public read access
+CREATE POLICY "Public can read teams" ON teams FOR SELECT USING (true);
+CREATE POLICY "Public can read settings" ON settings FOR SELECT USING (true);
+CREATE POLICY "Public can read matches" ON matches FOR SELECT USING (true);
+CREATE POLICY "Public can read brackets" ON brackets FOR SELECT USING (true);
+
+-- Authenticated full access (admin)
+CREATE POLICY "Admin can manage teams" ON teams FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin can manage settings" ON settings FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin can manage matches" ON matches FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin can manage brackets" ON brackets FOR ALL USING (auth.role() = 'authenticated');
+
+-- Updated_at trigger
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_teams_updated_at BEFORE UPDATE ON teams FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_matches_updated_at BEFORE UPDATE ON matches FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_brackets_updated_at BEFORE UPDATE ON brackets FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- Enable Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+ALTER PUBLICATION supabase_realtime ADD TABLE matches;
+ALTER PUBLICATION supabase_realtime ADD TABLE brackets;
+
+-- Insert default settings
+INSERT INTO settings (tournament_name, tournament_subtitle, tournament_status, footer_text)
+VALUES ('Neosoul Tournament', 'Community Mobile MOBA Tournament', 'upcoming', 'Built for the community, by the community.')
+ON CONFLICT DO NOTHING;
