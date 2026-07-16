@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Loader2, Wand2 } from "lucide-react";
+import { Swords, Loader2, Wand2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -422,6 +422,44 @@ export default function AdminBracketPage() {
     window.location.href = "/admin/tournament-generator";
   }, []);
 
+  const handleSyncBracket = useCallback(async () => {
+    const bracket = engineBracketRef.current;
+    if (!bracket) return;
+
+    setSaving(true);
+    try {
+      const finishedMatches = bracket.matches.filter(
+        (m) => m.status === "finished" && m.winnerId
+      );
+
+      if (finishedMatches.length === 0) {
+        setMessage("No finished matches to sync.");
+        setTimeout(() => setMessage(""), 2000);
+        setSaving(false);
+        return;
+      }
+
+      for (const m of finishedMatches) {
+        const syncError = await syncBracketsAfterSave(m, m.winnerId, supabase);
+        if (syncError) {
+          console.error("Sync error for match", m.id, syncError);
+          throw syncError;
+        }
+      }
+
+      await refetchBrackets();
+
+      setMessage(`Bracket synced! ${finishedMatches.length} match(es) updated.`);
+      setTimeout(() => setMessage(""), 2000);
+    } catch (err) {
+      console.error("Error syncing bracket:", err);
+      setMessage("Error syncing bracket.");
+      setTimeout(() => setMessage(""), 3000);
+    } finally {
+      setSaving(false);
+    }
+  }, [supabase, refetchBrackets]);
+
   if (loading) return <LoadingSkeleton />;
 
   return (
@@ -439,6 +477,15 @@ export default function AdminBracketPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 border-zinc-700 text-zinc-300 hover:text-white"
+            onClick={handleSyncBracket}
+            disabled={saving}
+          >
+            <RefreshCw className={cn("h-4 w-4", saving && "animate-spin")} />
+            Sync Bracket
+          </Button>
           <Link href="/admin/tournament-generator">
             <Button variant="outline" className="gap-2 border-zinc-700 text-zinc-300 hover:text-white">
               <Wand2 className="h-4 w-4" />
