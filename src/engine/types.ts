@@ -64,24 +64,9 @@ export interface EngineBracketConfig {
   seedingMode: SeedingMode;
 }
 
-export type RoundName =
-  | "Round of 64"
-  | "Round of 32"
-  | "Round of 16"
-  | "Quarter Final"
-  | "Semi Final"
-  | "Grand Final"
-  | "Champion";
-
-export const ROUND_ORDER: RoundName[] = [
-  "Round of 64",
-  "Round of 32",
-  "Round of 16",
-  "Quarter Final",
-  "Semi Final",
-  "Grand Final",
-  "Champion",
-];
+import { ROUND_ORDER as _ROUND_ORDER } from "@/lib/types";
+export type RoundName = import("@/lib/types").RoundName;
+export const ROUND_ORDER: RoundName[] = _ROUND_ORDER;
 
 export function getRoundName(bracketSize: number, roundIndex: number): RoundName {
   const totalRounds = Math.log2(bracketSize);

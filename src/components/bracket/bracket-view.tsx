@@ -14,6 +14,10 @@ interface BracketViewProps {
   isAdmin?: boolean;
 }
 
+const CARD_H = 56;
+const GAP = 8;
+const UNIT = CARD_H + GAP;
+
 export function BracketView({
   bracket,
   onMatchClick,
@@ -39,23 +43,39 @@ export function BracketView({
     return map;
   }, [bracket.matches, activeRounds]);
 
+  const positions = useMemo(() => {
+    const pos = new Map<string, number>();
+    const firstRound = groupedByRound.get(activeRounds[0]) || [];
+    firstRound.forEach((m, i) => {
+      pos.set(m.id, i * UNIT);
+    });
+    for (let r = 1; r < activeRounds.length; r++) {
+      const matches = groupedByRound.get(activeRounds[r]) || [];
+      const prevMatches = groupedByRound.get(activeRounds[r - 1]) || [];
+      matches.forEach((match, i) => {
+        const f0 = prevMatches[i * 2];
+        const f1 = prevMatches[i * 2 + 1];
+        const p0 = f0 ? (pos.get(f0.id) ?? 0) : 0;
+        const p1 = f1 ? (pos.get(f1.id) ?? 0) : p0;
+        pos.set(match.id, (p0 + p1) / 2);
+      });
+    }
+    return pos;
+  }, [groupedByRound, activeRounds]);
+
   const firstRoundCount = groupedByRound.get(activeRounds[0])?.length || 1;
-  const CARD_H = 56;
-  const GAP = 8;
-  const UNIT = CARD_H + GAP;
+  const minHeight = firstRoundCount * UNIT + 40;
 
   return (
     <div className="overflow-x-auto pb-6 -mx-4 px-4 bracket-scroll">
       <div
         className="flex items-start gap-0 min-w-fit"
-        style={{ minHeight: firstRoundCount * UNIT + 40 }}
+        style={{ minHeight }}
       >
         {activeRounds.map((roundName, roundIdx) => {
           const matches = groupedByRound.get(roundName) || [];
           const isFinal = roundName === "Grand Final";
           const config = ROUND_CONFIG[roundName];
-
-          const marginTop = roundIdx === 0 ? 0 : (Math.pow(2, roundIdx) - 1) * (UNIT / 2);
 
           return (
             <div key={roundName} className="contents">
@@ -79,10 +99,7 @@ export function BracketView({
 
               <div
                 className="flex flex-col flex-shrink-0"
-                style={{
-                  width: isFinal ? 220 : 240,
-                  paddingTop: marginTop,
-                }}
+                style={{ width: isFinal ? 220 : 240 }}
               >
                 <div className="text-center mb-3 px-2">
                   <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 sm:text-xs">
@@ -90,19 +107,28 @@ export function BracketView({
                   </span>
                 </div>
 
-                <div className="flex flex-col" style={{ gap: GAP * Math.pow(2, roundIdx) + CARD_H * (Math.pow(2, roundIdx) - 1) }}>
-                  {matches.map((match) => (
-                    <MatchCard
+                {matches.map((match, i) => {
+                  const y = positions.get(match.id) ?? i * UNIT;
+                  const prevBottom =
+                    i === 0 ? 0 : (positions.get(matches[i - 1].id) ?? 0) + CARD_H;
+                  const marginTop = y - prevBottom;
+
+                  return (
+                    <div
                       key={match.id}
-                      match={match}
-                      onClick={() => onMatchClick?.(match)}
-                      hoveredTeamId={hoveredTeamId}
-                      onTeamHover={onTeamHover}
-                      isAdmin={isAdmin}
-                      isFinal={isFinal}
-                    />
-                  ))}
-                </div>
+                      style={{ marginTop: i === 0 ? y : marginTop }}
+                    >
+                      <MatchCard
+                        match={match}
+                        onClick={() => onMatchClick?.(match)}
+                        hoveredTeamId={hoveredTeamId}
+                        onTeamHover={onTeamHover}
+                        isAdmin={isAdmin}
+                        isFinal={isFinal}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

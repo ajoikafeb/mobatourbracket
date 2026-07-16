@@ -29,7 +29,8 @@ export interface TournamentSnapshot {
 function getBracketSizeFromMatches(matches: Match[]): number {
   const round0Count = matches.filter((m) => m.round_order === 0).length;
   if (round0Count === 0) return 2;
-  return round0Count * 2;
+  const raw = round0Count * 2;
+  return Math.pow(2, Math.ceil(Math.log2(raw)));
 }
 
 function emptyBracket(): EngineBracket {
@@ -263,9 +264,14 @@ export function reconstructBracketFromDB(
   for (let roundIdx = 0; roundIdx <= totalRounds; roundIdx++) {
     const roundMatches = matches
       .filter((m) => m.round_order === roundIdx)
-      .sort((a, b) => a.match_index - b.match_index);
+      .sort((a, b) => {
+        if (a.match_index !== b.match_index) return a.match_index - b.match_index;
+        return a.id.localeCompare(b.id);
+      });
 
-    for (const dbMatch of roundMatches) {
+    for (let idx = 0; idx < roundMatches.length; idx++) {
+      const dbMatch = roundMatches[idx];
+      const matchIndex = idx;
       const teamA = dbMatch.team_a_id ? teamMap.get(dbMatch.team_a_id) || null : null;
       const teamB = dbMatch.team_b_id ? teamMap.get(dbMatch.team_b_id) || null : null;
 
@@ -273,8 +279,8 @@ export function reconstructBracketFromDB(
       const engineTeamB = teamB ? mapTeamFromDB(teamB, dbMatch.winner_id != null && dbMatch.winner_id !== dbMatch.team_b_id) : null;
 
       const nextRoundOrder = roundIdx + 1;
-      const nextMatchIndex = Math.floor(dbMatch.match_index / 2);
-      const nextSlot: "A" | "B" = dbMatch.match_index % 2 === 0 ? "A" : "B";
+      const nextMatchIndex = Math.floor(matchIndex / 2);
+      const nextSlot: "A" | "B" = matchIndex % 2 === 0 ? "A" : "B";
 
       const nextMatch = nextRoundOrder < totalRounds
         ? matches.find(
@@ -286,7 +292,7 @@ export function reconstructBracketFromDB(
         id: dbMatch.id,
         round: getRoundName(bracketSize, roundIdx),
         roundOrder: roundIdx,
-        matchIndex: dbMatch.match_index,
+        matchIndex: matchIndex,
         matchNumber: matchNumber++,
         teamA: engineTeamA,
         teamB: engineTeamB,
