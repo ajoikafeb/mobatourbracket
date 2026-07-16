@@ -55,7 +55,7 @@ export default function HomePage() {
                 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight"
               >
                 <span className="bg-gradient-to-r from-white via-white to-zinc-400 bg-clip-text text-transparent">
-                  {settings?.tournament_name || "Neosoul"}
+                  Neosoul Mobile Legend Tournament
                 </span>
                 <br />
                 <span className="bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
@@ -70,7 +70,7 @@ export default function HomePage() {
                 className="mt-6 text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto"
               >
                 {settings?.tournament_subtitle ||
-                  "Community Mobile MOBA Tournament — Track brackets, schedules, and live matches in real-time."}
+                  "Indonesian Community Tournament — Track brackets, schedules, and live matches in real-time."}
               </motion.p>
 
               <motion.div

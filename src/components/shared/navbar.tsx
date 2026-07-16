@@ -46,9 +46,6 @@ export function Navbar() {
               className="h-10 w-10 rounded-xl object-contain"
               priority
             />
-            <span className="text-lg font-bold text-white hidden sm:block">
-              Neosoul
-            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-1">
