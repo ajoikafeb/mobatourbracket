@@ -13,6 +13,7 @@ import {
   X,
   Shield,
   Home,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const navLinks = [
   { href: "/bracket", label: "Bracket", icon: Swords },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/current-match", label: "Live", icon: Radio },
+  { href: "/events", label: "Events", icon: Trophy },
 ];
 
 export function Navbar() {

@@ -8,11 +8,9 @@ import {
   Swords,
   MapPin,
   Filter,
-  ChevronDown,
   Radio,
   CheckCircle2,
   Timer,
-  Zap,
   ArrowRight,
 } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
@@ -22,14 +20,13 @@ import { PageWrapper } from "@/components/shared/page-wrapper";
 import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMatches } from "@/hooks/use-matches";
 import { useSettings } from "@/hooks/use-settings";
 import { cn, formatDate, formatTime, isToday, isTomorrow } from "@/lib/utils";
 import type { Match } from "@/lib/types";
 
-type FilterType = "all" | "upcoming" | "live" | "finished";
+type StatusFilter = "all" | "upcoming" | "live" | "finished";
 
 function getDateKey(dateStr: string) {
   const d = new Date(dateStr);
@@ -46,12 +43,6 @@ const statusBorderClass: Record<Match["status"], string> = {
   live: "border-l-red-500",
   finished: "border-l-green-500",
   waiting: "border-l-zinc-500",
-};
-
-const statusDotClass: Record<Match["status"], string> = {
-  live: "bg-red-500",
-  finished: "bg-green-500",
-  waiting: "bg-zinc-500",
 };
 
 const cardVariants = {
@@ -76,24 +67,35 @@ const groupVariants = {
 };
 
 export default function SchedulePage() {
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [roundFilter, setRoundFilter] = useState<string>("all");
   const { matches, loading } = useMatches();
   const { settings } = useSettings();
 
+  const availableRounds = useMemo(() => {
+    const rounds = [...new Set(matches.map((m) => m.round))].sort(
+      (a, b) => {
+        const orderA = matches.find((m) => m.round === a)?.round_order ?? 0;
+        const orderB = matches.find((m) => m.round === b)?.round_order ?? 0;
+        return orderA - orderB;
+      }
+    );
+    return rounds;
+  }, [matches]);
+
   const filteredMatches = useMemo(() => {
     return matches.filter((match) => {
-      switch (filter) {
-        case "upcoming":
-          return match.status === "waiting";
-        case "live":
-          return match.status === "live";
-        case "finished":
-          return match.status === "finished";
-        default:
-          return true;
-      }
+      const statusOk =
+        statusFilter === "all" ||
+        (statusFilter === "upcoming" && match.status === "waiting") ||
+        (statusFilter === "live" && match.status === "live") ||
+        (statusFilter === "finished" && match.status === "finished");
+
+      const roundOk = roundFilter === "all" || match.round === roundFilter;
+
+      return statusOk && roundOk;
     });
-  }, [matches, filter]);
+  }, [matches, statusFilter, roundFilter]);
 
   const groupedMatches = useMemo(() => {
     const groups: Record<string, Match[]> = {};
@@ -115,7 +117,15 @@ export default function SchedulePage() {
     return counts;
   }, [matches]);
 
-  const filters: { label: string; value: FilterType; icon: typeof Filter }[] = [
+  const matchCountByRound = useMemo(() => {
+    const counts: Record<string, number> = { all: matches.length };
+    for (const m of matches) {
+      counts[m.round] = (counts[m.round] || 0) + 1;
+    }
+    return counts;
+  }, [matches]);
+
+  const statusFilters: { label: string; value: StatusFilter; icon: typeof Filter }[] = [
     { label: "All", value: "all", icon: Filter },
     { label: "Upcoming", value: "upcoming", icon: Timer },
     { label: "Live", value: "live", icon: Radio },
@@ -151,7 +161,7 @@ export default function SchedulePage() {
                       Match Schedule
                     </h1>
                     <p className="text-sm text-zinc-400 mt-1">
-                      {matches.length} total match{matches.length !== 1 ? "es" : ""} scheduled
+                      {filteredMatches.length} of {matches.length} match{matches.length !== 1 ? "es" : ""}
                     </p>
                   </div>
                 </div>
@@ -164,44 +174,32 @@ export default function SchedulePage() {
                 )}
               </div>
 
+              {/* ── Status Filter ────────────────────── */}
               <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1">
-                {filters.map((f) => {
+                {statusFilters.map((f) => {
                   const Icon = f.icon;
-                  const isActive = filter === f.value;
+                  const isActive = statusFilter === f.value;
                   const count = matchCountByStatus[f.value];
                   return (
                     <button
                       key={f.value}
-                      onClick={() => setFilter(f.value)}
+                      onClick={() => setStatusFilter(f.value)}
                       className={cn(
                         "relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
-                        isActive
-                          ? "text-white"
-                          : "text-zinc-400 hover:text-white"
+                        isActive ? "text-white" : "text-zinc-400 hover:text-white"
                       )}
                     >
                       {isActive && (
                         <motion.div
-                          layoutId="schedule-filter"
+                          layoutId="status-filter"
                           className="absolute inset-0 rounded-xl bg-orange-500/20 border border-orange-500/20"
-                          transition={{
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 30,
-                          }}
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
                         />
                       )}
                       <span className="relative z-10 flex items-center gap-2">
                         <Icon className="h-3.5 w-3.5" />
                         {f.label}
-                        <span
-                          className={cn(
-                            "ml-0.5 text-xs tabular-nums",
-                            isActive
-                              ? "text-orange-300/80"
-                              : "text-zinc-600"
-                          )}
-                        >
+                        <span className={cn("ml-0.5 text-xs tabular-nums", isActive ? "text-orange-300/80" : "text-zinc-600")}>
                           {count}
                         </span>
                       </span>
@@ -209,6 +207,40 @@ export default function SchedulePage() {
                   );
                 })}
               </div>
+
+              {/* ── Round Filter ─────────────────────── */}
+              {availableRounds.length > 1 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setRoundFilter("all")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                      roundFilter === "all"
+                        ? "bg-orange-500/20 text-orange-300 border border-orange-500/20"
+                        : "bg-white/[0.04] text-zinc-400 border border-white/[0.06] hover:text-white hover:border-white/[0.12]"
+                    )}
+                  >
+                    <Swords className="h-3 w-3" />
+                    All Rounds
+                    <span className="text-[10px] opacity-60">{matchCountByRound.all}</span>
+                  </button>
+                  {availableRounds.map((round) => (
+                    <button
+                      key={round}
+                      onClick={() => setRoundFilter(round)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                        roundFilter === round
+                          ? "bg-orange-500/20 text-orange-300 border border-orange-500/20"
+                          : "bg-white/[0.04] text-zinc-400 border border-white/[0.06] hover:text-white hover:border-white/[0.12]"
+                      )}
+                    >
+                      {round}
+                      <span className="text-[10px] opacity-60">{matchCountByRound[round]}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {loading ? (
@@ -216,17 +248,17 @@ export default function SchedulePage() {
             ) : filteredMatches.length === 0 ? (
               <EmptyState
                 icon={Calendar}
-                title="No matches scheduled yet"
+                title="No matches found"
                 description={
-                  filter === "all"
+                  statusFilter === "all" && roundFilter === "all"
                     ? "Matches will appear here once they are created."
-                    : `No ${filter} matches at the moment.`
+                    : "No matches match the current filters."
                 }
               />
             ) : (
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={filter}
+                  key={`${statusFilter}-${roundFilter}`}
                   variants={groupVariants}
                   initial="hidden"
                   animate="visible"
@@ -239,10 +271,7 @@ export default function SchedulePage() {
                     const isDateTomorrow = dateLabel === "Tomorrow";
 
                     return (
-                      <motion.section
-                        key={dateKey}
-                        variants={groupVariants}
-                      >
+                      <motion.section key={dateKey} variants={groupVariants}>
                         <div className="flex items-center gap-3 mb-4">
                           <div
                             className={cn(
@@ -250,8 +279,8 @@ export default function SchedulePage() {
                               isDateToday
                                 ? "bg-orange-500/20 text-orange-300 border border-orange-500/20"
                                 : isDateTomorrow
-                                  ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
-                                  : "bg-white/[0.05] text-zinc-300 border border-white/[0.08]"
+                                ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
+                                : "bg-white/[0.05] text-zinc-300 border border-white/[0.08]"
                             )}
                           >
                             <Calendar className="h-3.5 w-3.5" />
@@ -291,16 +320,10 @@ export default function SchedulePage() {
                                     )}
                                   >
                                     <div className="flex items-start justify-between mb-3">
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className={cn(
-                                            "inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400"
-                                          )}
-                                        >
-                                          <Swords className="h-3.5 w-3.5" />
-                                          {match.round}
-                                        </span>
-                                      </div>
+                                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+                                        <Swords className="h-3.5 w-3.5" />
+                                        {match.round}
+                                      </span>
                                       <StatusBadge status={match.status} />
                                     </div>
 
@@ -310,29 +333,21 @@ export default function SchedulePage() {
                                           <span
                                             className={cn(
                                               "text-sm sm:text-base font-semibold truncate transition-colors",
-                                              isWinnerA
-                                                ? "text-orange-400"
-                                                : "text-white"
+                                              isWinnerA ? "text-orange-400" : "text-white"
                                             )}
                                           >
                                             {match.team_a}
                                           </span>
-                                          {isWinnerA && (
-                                            <CheckCircle2 className="h-4 w-4 text-orange-400 shrink-0" />
-                                          )}
+                                          {isWinnerA && <CheckCircle2 className="h-4 w-4 text-orange-400 shrink-0" />}
                                         </div>
                                       </div>
 
                                       <div className="flex items-center gap-2 shrink-0">
                                         {isLive || isFinished ? (
                                           <div className="flex items-center gap-1.5 rounded-lg bg-white/[0.05] px-3 py-1.5">
-                                            <span className="text-lg font-bold text-white tabular-nums">
-                                              {match.score_a}
-                                            </span>
+                                            <span className="text-lg font-bold text-white tabular-nums">{match.score_a}</span>
                                             <span className="text-xs text-zinc-500 font-medium">vs</span>
-                                            <span className="text-lg font-bold text-white tabular-nums">
-                                              {match.score_b}
-                                            </span>
+                                            <span className="text-lg font-bold text-white tabular-nums">{match.score_b}</span>
                                           </div>
                                         ) : (
                                           <div className="flex items-center gap-1.5 text-zinc-500">
@@ -344,15 +359,11 @@ export default function SchedulePage() {
 
                                       <div className="flex-1 min-w-0 flex justify-end">
                                         <div className="flex items-center gap-2">
-                                          {isWinnerB && (
-                                            <CheckCircle2 className="h-4 w-4 text-orange-400 shrink-0" />
-                                          )}
+                                          {isWinnerB && <CheckCircle2 className="h-4 w-4 text-orange-400 shrink-0" />}
                                           <span
                                             className={cn(
                                               "text-sm sm:text-base font-semibold truncate text-right transition-colors",
-                                              isWinnerB
-                                                ? "text-orange-400"
-                                                : "text-white"
+                                              isWinnerB ? "text-orange-400" : "text-white"
                                             )}
                                           >
                                             {match.team_b}
@@ -365,22 +376,18 @@ export default function SchedulePage() {
                                       <div className="flex items-center gap-3">
                                         <div className="flex items-center gap-1.5 text-zinc-500">
                                           <Clock className="h-3.5 w-3.5" />
-                                          <span className="text-xs font-mono">
-                                            {formatTime(match.match_date)}
-                                          </span>
+                                          <span className="text-xs font-mono">{formatTime(match.match_date)}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <span
-                                            className={cn(
-                                              "text-[10px] font-bold px-1.5 py-0.5 rounded-md border",
-                                              match.best_of >= 5
-                                                ? "border-orange-500/30 bg-orange-500/15 text-orange-300"
-                                                : "border-white/[0.08] bg-white/[0.05] text-zinc-400"
-                                            )}
-                                          >
-                                            {bestOfLabel(match.best_of)}
-                                          </span>
-                                        </div>
+                                        <span
+                                          className={cn(
+                                            "text-[10px] font-bold px-1.5 py-0.5 rounded-md border",
+                                            match.best_of >= 5
+                                              ? "border-orange-500/30 bg-orange-500/15 text-orange-300"
+                                              : "border-white/[0.08] bg-white/[0.05] text-zinc-400"
+                                          )}
+                                        >
+                                          {bestOfLabel(match.best_of)}
+                                        </span>
                                       </div>
 
                                       {isLive && (
@@ -388,20 +395,12 @@ export default function SchedulePage() {
                                           <span className="relative flex h-2 w-2">
                                             <motion.span
                                               className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"
-                                              animate={{
-                                                scale: [1, 1.8, 1],
-                                                opacity: [0.75, 0, 0.75],
-                                              }}
-                                              transition={{
-                                                duration: 1.5,
-                                                repeat: Infinity,
-                                              }}
+                                              animate={{ scale: [1, 1.8, 1], opacity: [0.75, 0, 0.75] }}
+                                              transition={{ duration: 1.5, repeat: Infinity }}
                                             />
                                             <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
                                           </span>
-                                          <span className="text-[10px] font-bold uppercase tracking-wider">
-                                            Live
-                                          </span>
+                                          <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
                                         </div>
                                       )}
                                     </div>
