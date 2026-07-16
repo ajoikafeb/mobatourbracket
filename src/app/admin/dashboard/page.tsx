@@ -19,6 +19,7 @@ import {
   Flag,
   ChevronRight,
   Award,
+  Trash2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,7 @@ export default function AdminDashboardPage() {
     proceedToNextRound: doProceedToNextRound,
     finishTournament: doFinishTournament,
     resetAll: doResetAll,
+    deleteHistory: doDeleteHistory,
   } = useTournament();
 
   const totalMatches = matches.length;
@@ -367,6 +369,22 @@ export default function AdminDashboardPage() {
                 >
                   <RotateCcw className="h-4 w-4" />
                   Reset
+                </Button>
+              )}
+
+              {tournamentState === "draft" && totalMatches > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm("Delete ALL tournament data (teams, matches, brackets)? This cannot be undone.")) {
+                      doDeleteHistory();
+                    }
+                  }}
+                  disabled={actionLoading}
+                  className="gap-2 border-zinc-700 text-zinc-300 hover:text-red-400 hover:border-red-500/30"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete History
                 </Button>
               )}
             </div>

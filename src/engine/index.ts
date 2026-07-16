@@ -73,6 +73,7 @@ export {
   saveMatchResult,
   resetMatchResult,
   resetAllMatches,
+  deleteTournamentHistory,
 } from "./tournament-service";
 
 export type { TournamentSnapshot, RoundProgress } from "./tournament-service";

@@ -10,6 +10,7 @@ import {
   saveMatchResult,
   resetMatchResult,
   resetAllMatches,
+  deleteTournamentHistory,
   startTournament,
   finishTournament,
   setCurrentMatchId,
@@ -261,6 +262,21 @@ export function useTournament() {
     setTeams(teamsRes.error ? [] : teamsRes.data || []);
   }, []);
 
+  const doDeleteHistory = useCallback(async () => {
+    if (!settings) return;
+    setActionLoading(true);
+    try {
+      const err = await deleteTournamentHistory(supabaseRef.current, settings.id);
+      if (err) throw err;
+      showMsg("Tournament history deleted!");
+    } catch (err) {
+      console.error("Error deleting history:", err);
+      showMsg("Error deleting history.");
+    } finally {
+      setActionLoading(false);
+    }
+  }, [settings, showMsg]);
+
   return {
     settings,
     matches,
@@ -293,6 +309,7 @@ export function useTournament() {
     saveMatch: doSaveMatch,
     resetMatch: doResetMatch,
     resetAll: doResetAll,
+    deleteHistory: doDeleteHistory,
     refetch,
     setMessage,
   };

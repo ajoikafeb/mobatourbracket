@@ -93,7 +93,7 @@ export function getRoundName(bracketSize: number, roundIndex: number): RoundName
     "Semi Final",
     "Grand Final",
   ];
-  const startIdx = totalRounds - 1 - roundIndex;
+  const startIdx = roundIndex + (allRounds.length - totalRounds);
   return allRounds[Math.max(0, Math.min(startIdx, allRounds.length - 1))] || "Grand Final";
 }
 

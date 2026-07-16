@@ -139,8 +139,11 @@ export function getCurrentMatchFromSettings(settings: Settings, matches: Match[]
 }
 
 export function findChampion(matches: Match[], teams: Team[]): Team | null {
-  const grandFinal = matches.find(
-    (m) => m.round === "Grand Final" && m.status === "finished" && m.winner_id
+  const finishedMatches = matches.filter((m) => m.status === "finished");
+  if (finishedMatches.length === 0) return null;
+  const highestRound = Math.max(...finishedMatches.map((m) => m.round_order));
+  const grandFinal = finishedMatches.find(
+    (m) => m.round_order === highestRound && m.winner_id
   );
   if (!grandFinal?.winner_id) return null;
   return teams.find((t) => t.id === grandFinal.winner_id) || null;
@@ -150,7 +153,16 @@ export function findPlacements(matches: Match[], teams: Team[], topN: number): {
   const results: { rank: number; team: Team | null }[] = [];
   const teamMap = new Map(teams.map((t) => [t.id, t]));
 
-  const gf = matches.find((m) => m.round === "Grand Final" && m.status === "finished");
+  const finishedMatches = matches.filter((m) => m.status === "finished");
+  if (finishedMatches.length === 0) {
+    for (let i = 0; i < topN; i++) results.push({ rank: i + 1, team: null });
+    return results;
+  }
+
+  const roundOrders = [...new Set(finishedMatches.map((m) => m.round_order))].sort((a, b) => a - b);
+  const highestRound = roundOrders[roundOrders.length - 1];
+  const gf = finishedMatches.find((m) => m.round_order === highestRound);
+
   if (gf?.winner_id) {
     results.push({ rank: 1, team: teamMap.get(gf.winner_id) || null });
   } else {
@@ -166,23 +178,27 @@ export function findPlacements(matches: Match[], teams: Team[], topN: number): {
   }
   if (topN <= 2) return results;
 
-  const sfMatches = matches.filter((m) => m.round === "Semi Final" && m.status === "finished");
-  const sfLosers = sfMatches.map((m) => {
-    const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
-    return loserId ? teamMap.get(loserId) || null : null;
-  });
-  for (let i = 0; i < Math.min(sfLosers.length, topN - 2); i++) {
-    results.push({ rank: 3 + i, team: sfLosers[i] });
-  }
-  if (topN <= 4) return results;
+  const loserRounds = roundOrders.slice(0, -1).reverse();
+  let nextRank = 3;
+  let slotsLeft = topN - 2;
 
-  const qfMatches = matches.filter((m) => m.round === "Quarter Final" && m.status === "finished");
-  const qfLosers = qfMatches.map((m) => {
-    const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
-    return loserId ? teamMap.get(loserId) || null : null;
-  });
-  for (let i = 0; i < Math.min(qfLosers.length, topN - 4); i++) {
-    results.push({ rank: 5 + i, team: qfLosers[i] });
+  for (const roundOrder of loserRounds) {
+    if (slotsLeft <= 0) break;
+    const roundMatches = finishedMatches.filter((m) => m.round_order === roundOrder);
+    const losers = roundMatches.map((m) => {
+      const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
+      return loserId ? teamMap.get(loserId) || null : null;
+    });
+    const count = Math.min(losers.length, slotsLeft);
+    for (let i = 0; i < count; i++) {
+      results.push({ rank: nextRank, team: losers[i] });
+      nextRank++;
+    }
+    slotsLeft -= count;
+  }
+
+  while (results.length < topN) {
+    results.push({ rank: results.length + 1, team: null });
   }
 
   return results;
@@ -316,6 +332,9 @@ type SupabaseClient = {
   from: (table: string) => {
     update: (data: Record<string, unknown>) => {
       eq: (col: string, val: unknown) => Promise<{ error: unknown }>;
+    };
+    delete: () => {
+      neq: (col: string, val: unknown) => Promise<{ error: unknown }>;
     };
     insert: (data: Record<string, unknown> | Record<string, unknown>[]) => {
       select: () => Promise<{ error: unknown }>;
@@ -549,6 +568,39 @@ export async function resetAllMatches(
     })
     .eq("id", settingsId);
   if (settingsErr) return new Error(String(settingsErr));
+
+  return null;
+}
+
+export async function deleteTournamentHistory(
+  supabase: SupabaseClient,
+  settingsId: string
+): Promise<Error | null> {
+  const { error: matchErr } = await supabase
+    .from("matches")
+    .delete()
+    .neq("id", "00000000-0000-0000-0000-000000000000");
+  if (matchErr) return new Error(String(matchErr));
+
+  const { error: teamErr } = await supabase
+    .from("teams")
+    .delete()
+    .neq("id", "00000000-0000-0000-0000-000000000000");
+  if (teamErr) return new Error(String(teamErr));
+
+  const { error: bracketErr } = await supabase
+    .from("brackets")
+    .delete()
+    .neq("id", "00000000-0000-0000-0000-000000000000");
+  if (bracketErr) return new Error(String(bracketErr));
+
+  const { error: settingsErr2 } = await supabase
+    .from("settings")
+    .update({
+      tournament_status: "upcoming",
+    })
+    .eq("id", settingsId);
+  if (settingsErr2) return new Error(String(settingsErr2));
 
   return null;
 }
