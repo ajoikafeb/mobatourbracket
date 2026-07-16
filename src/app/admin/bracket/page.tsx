@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Loader2, Wand2, RefreshCw } from "lucide-react";
+import { Swords, Loader2, Wand2, RefreshCw, Calendar } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { BracketView } from "@/components/bracket/bracket-view";
 import { MatchEditor } from "@/components/admin/match-editor";
 import { BracketToolbar } from "@/components/admin/bracket-toolbar";
+import { RoundScheduler } from "@/components/admin/round-scheduler";
 import {
   generateBracket,
   computeStats,
@@ -176,6 +177,7 @@ export default function AdminBracketPage() {
   const [hoveredTeamId, setHoveredTeamId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [showScheduler, setShowScheduler] = useState(false);
   const engineBracketRef = useRef<EngineBracket | null>(null);
 
   const supabase = createClient();
@@ -486,6 +488,15 @@ export default function AdminBracketPage() {
             <RefreshCw className={cn("h-4 w-4", saving && "animate-spin")} />
             Sync Bracket
           </Button>
+          <Button
+            variant="outline"
+            className="gap-2 border-zinc-700 text-zinc-300 hover:text-white"
+            onClick={() => setShowScheduler(true)}
+            disabled={saving}
+          >
+            <Calendar className="h-4 w-4" />
+            Schedule Round
+          </Button>
           <Link href="/admin/tournament-generator">
             <Button variant="outline" className="gap-2 border-zinc-700 text-zinc-300 hover:text-white">
               <Wand2 className="h-4 w-4" />
@@ -565,6 +576,18 @@ export default function AdminBracketPage() {
           <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
           <span className="text-xs text-zinc-300">Saving...</span>
         </div>
+      )}
+
+      {showScheduler && (
+        <RoundScheduler
+          matches={dbMatches}
+          settings={settings}
+          onScheduled={() => {
+            refetchMatches();
+            refetchBrackets();
+          }}
+          onClose={() => setShowScheduler(false)}
+        />
       )}
     </div>
   );
