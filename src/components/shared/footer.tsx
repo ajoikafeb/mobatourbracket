@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { useSettings } from "@/hooks/use-settings";
+import type { Settings } from "@/lib/types";
 
-export function Footer() {
-  const { settings } = useSettings();
+export function Footer({ settings: externalSettings }: { settings?: Settings | null }) {
+  const { settings: hookSettings } = useSettings();
+  const settings = externalSettings ?? hookSettings;
 
   return (
     <footer className="relative border-t border-white/[0.05] bg-[#09090B]">
@@ -28,7 +30,7 @@ export function Footer() {
               "Indonesian Community Tournament Tracker. Built for the community, by the community."}
           </p>
           <div className="flex items-center gap-4 text-xs text-zinc-700">
-            <span>© 2026 Neosoul Indonesia</span>
+            <span>&copy; {new Date().getFullYear()} Neosoul Indonesia</span>
             <span className="w-0.5 h-0.5 rounded-full bg-zinc-700" />
             <span>All rights reserved</span>
           </div>

@@ -18,6 +18,7 @@ import {
   Loader2,
   Wand2,
   Sparkles,
+  Download,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const sidebarLinks = [
   { href: "/admin/bracket", label: "Bracket Editor", icon: Swords },
   { href: "/admin/schedule", label: "Schedule Editor", icon: Calendar },
   { href: "/admin/current-match", label: "Current Match", icon: Radio },
+  { href: "/admin/export", label: "Export Data", icon: Download },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

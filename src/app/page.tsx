@@ -24,6 +24,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useTournament } from "@/hooks/use-tournament";
+import { ROUND_CONFIG } from "@/lib/types";
+import type { RoundName } from "@/lib/types";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 
 const fadeUp: Variants = {
@@ -52,22 +54,24 @@ const scaleIn: Variants = {
   },
 };
 
-const BRACKET_ROUNDS = [
-  { key: "round-of-16", label: "Round of 16", shortLabel: "R16" },
-  { key: "quarter-final", label: "Quarter Final", shortLabel: "QF" },
-  { key: "semi-final", label: "Semi Final", shortLabel: "SF" },
-  { key: "grand-final", label: "Grand Final", shortLabel: "GF" },
-  { key: "champion", label: "Champion", shortLabel: "Winner" },
-];
-
 const STATUS_MAP: Record<string, "waiting" | "live" | "finished"> = {
   upcoming: "waiting",
   ongoing: "live",
   completed: "finished",
 };
 
+const ROUND_NAME_MAP: Record<string, string> = {
+  "Round of 64": "R64",
+  "Round of 32": "R32",
+  "Round of 16": "R16",
+  "Quarter Final": "QF",
+  "Semi Final": "SF",
+  "Grand Final": "GF",
+  "Champion": "Winner",
+};
+
 export default function HomePage() {
-  const { currentMatch, matches, teams, settings, loading } = useTournament();
+  const { currentMatch, matches, teams, settings, loading, bracket } = useTournament();
 
   const nextMatch = !currentMatch
     ? matches
@@ -86,7 +90,17 @@ export default function HomePage() {
 
       <main className="relative z-10">
         <PageWrapper>
-
+          {loading ? (
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-32 space-y-8">
+              <div className="h-8 w-48 bg-white/5 rounded-lg animate-pulse mx-auto" />
+              <div className="h-4 w-96 bg-white/5 rounded-lg animate-pulse mx-auto" />
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-16">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="h-32 bg-white/5 rounded-[20px] animate-pulse" />
+                ))}
+              </div>
+            </div>
+          ) : (<>
           {/* ── Hero Section ──────────────────────────────────────────── */}
           <section className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-20 pb-24 sm:pt-32 sm:pb-32 overflow-hidden">
             <div className="absolute inset-0 pointer-events-none">
@@ -398,7 +412,13 @@ export default function HomePage() {
                   <div className="absolute top-6 left-[10%] right-[10%] h-px border-t-2 border-dashed border-white/[0.08]" />
 
                   <div className="relative flex items-start justify-between gap-2">
-                    {BRACKET_ROUNDS.map((round, i) => {
+                    {(() => {
+                      const rounds = bracket.rounds.filter(r => r.name !== "Champion");
+                      const items = rounds.length > 0
+                        ? [...rounds.map(r => ({ key: r.name, label: r.name, shortLabel: ROUND_NAME_MAP[r.name] || r.name.substring(0, 3).toUpperCase() })), { key: "champion", label: "Champion", shortLabel: "Winner" }]
+                        : [{ key: "round-of-16", label: "Round of 16", shortLabel: "R16" }, { key: "quarter-final", label: "Quarter Final", shortLabel: "QF" }, { key: "semi-final", label: "Semi Final", shortLabel: "SF" }, { key: "grand-final", label: "Grand Final", shortLabel: "GF" }, { key: "champion", label: "Champion", shortLabel: "Winner" }];
+                      return items;
+                    })().map((round: { key: string; label: string; shortLabel: string }, i: number) => {
                       const isChampion = round.key === "champion";
                       return (
                         <div key={round.key} className="flex flex-col items-center flex-1 min-w-0">
@@ -482,7 +502,11 @@ export default function HomePage() {
                   </p>
 
                   <div className="flex flex-wrap items-center justify-center gap-3">
-                    {["Round of 16", "Quarter Final", "Semi Final", "Grand Final"].map(
+                    {(() => {
+                      const rounds = bracket.rounds.filter(r => r.name !== "Champion");
+                      const names = rounds.length > 0 ? rounds.map(r => r.name) : ["Round of 16", "Quarter Final", "Semi Final", "Grand Final"];
+                      return names;
+                    })().map(
                       (round, i) => (
                         <motion.div
                           key={round}
@@ -502,7 +526,8 @@ export default function HomePage() {
               </div>
             </motion.div>
           </section>
-
+          </>
+          )}
         </PageWrapper>
       </main>
 

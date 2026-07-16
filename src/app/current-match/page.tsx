@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useTournament } from "@/hooks/use-tournament";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 import type { Match, Team } from "@/lib/types";
+import Link from "next/link";
 
 function LiveIndicator() {
   return (
@@ -281,6 +282,7 @@ function TeamDetailPanel({
     team.player_3,
     team.player_4,
     team.player_5,
+    team.player_6,
   ].filter(Boolean);
 
   return (
@@ -307,7 +309,7 @@ function TeamDetailPanel({
                 {idx + 1}
               </span>
               <span className="text-sm text-zinc-300">{player}</span>
-              {idx === 0 && (
+              {team.captain && player === team.captain && (
                 <span className="ml-auto text-[10px] font-semibold text-orange-400 uppercase">
                   Captain
                 </span>
@@ -340,17 +342,19 @@ function RecentResults({ matches }: { matches: Match[] }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.6 }}
     >
-      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-zinc-500" />
           <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
             Recent Results
           </h3>
         </div>
-        <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white gap-1">
-          View Full Schedule
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
+        <Link href="/schedule">
+          <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white gap-1">
+            View Full Schedule
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </Link>
       </div>
       <div className="grid gap-3">
         {matches.map((m, idx) => (
@@ -454,10 +458,10 @@ export default function CurrentMatchPage() {
     : null;
 
   const teamAData = teams.find(
-    (t) => t.team_name === match?.team_a || t.id === match?.team_a_id
+    (t) => match?.team_a_id ? t.id === match.team_a_id : t.team_name === match?.team_a
   );
   const teamBData = teams.find(
-    (t) => t.team_name === match?.team_b || t.id === match?.team_b_id
+    (t) => match?.team_b_id ? t.id === match.team_b_id : t.team_name === match?.team_b
   );
 
   return (
@@ -531,7 +535,7 @@ export default function CurrentMatchPage() {
                     isWinner={match.winner === match.team_a}
                     players={
                       teamAData
-                        ? [teamAData.player_1, teamAData.player_2, teamAData.player_3, teamAData.player_4, teamAData.player_5]
+                        ? [teamAData.player_1, teamAData.player_2, teamAData.player_3, teamAData.player_4, teamAData.player_5, teamAData.player_6].filter(Boolean)
                         : undefined
                     }
                   />
@@ -546,7 +550,7 @@ export default function CurrentMatchPage() {
                     isWinner={match.winner === match.team_b}
                     players={
                       teamBData
-                        ? [teamBData.player_1, teamBData.player_2, teamBData.player_3, teamBData.player_4, teamBData.player_5]
+                        ? [teamBData.player_1, teamBData.player_2, teamBData.player_3, teamBData.player_4, teamBData.player_5, teamBData.player_6].filter(Boolean)
                         : undefined
                     }
                   />
@@ -590,7 +594,7 @@ export default function CurrentMatchPage() {
         </PageWrapper>
       </main>
 
-      <Footer />
+      <Footer settings={settings} />
     </div>
   );
 }
