@@ -165,6 +165,20 @@ export default function AdminBracketPage() {
       }
     }
 
+    for (const m of bracket.matches) {
+      if (m.round === "Champion") continue;
+      const nextRoundOrder = m.roundOrder + 1;
+      const nextMatchIndex = Math.floor(m.matchIndex / 2);
+      const nextSlot: "A" | "B" = m.matchIndex % 2 === 0 ? "A" : "B";
+      const nextMatch = bracket.matches.find(
+        (nm) => nm.roundOrder === nextRoundOrder && nm.matchIndex === nextMatchIndex
+      );
+      if (nextMatch) {
+        m.nextMatchId = nextMatch.id;
+        m.nextSlot = nextSlot;
+      }
+    }
+
     bracket.stats = computeStats(bracket.matches);
 
     setEngineBracket(bracket);
