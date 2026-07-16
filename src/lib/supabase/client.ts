@@ -2,109 +2,70 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
-interface EmptyResult {
-  data: unknown;
-  error: null;
+const ok = (data: unknown = null) => Promise.resolve({ data, error: null });
+
+function buildChainProxy(): Record<string, unknown> {
+  const proxy: Record<string, unknown> = {};
+  const methods = [
+    "select",
+    "insert",
+    "update",
+    "delete",
+    "eq",
+    "neq",
+    "gte",
+    "lte",
+    "gt",
+    "lt",
+    "neq",
+    "not",
+    "in",
+    "or",
+    "like",
+    "ilike",
+    "order",
+    "limit",
+    "single",
+    "maybeSingle",
+    "csv",
+    "throwOnError",
+  ];
+
+  for (const m of methods) {
+    if (m === "single" || m === "maybeSingle" || m === "csv" || m === "throwOnError") {
+      proxy[m] = () => ok([]);
+    } else {
+      proxy[m] = () => proxy;
+    }
+  }
+
+  proxy.then = undefined;
+
+  return proxy;
 }
 
-type EmptyPromise = Promise<EmptyResult>;
-
-interface EmptyTableProxy {
-  select: () => EmptyChainProxy;
-  insert: () => EmptyChainProxy;
-  update: () => EmptyChainProxy;
-  delete: () => EmptyChainProxy;
-  upsert: () => EmptyPromise;
-  eq: () => EmptyChainProxy;
-  neq: () => EmptyChainProxy;
-  gte: () => EmptyChainProxy;
-  not: () => EmptyChainProxy;
-  order: () => EmptyChainProxy;
-  limit: () => EmptyChainProxy;
-  single: () => EmptyPromise;
-  then: undefined;
-  [key: string]: (() => EmptyChainProxy) | (() => EmptyPromise) | undefined;
-}
-
-interface EmptyChainProxy {
-  select: EmptyChainProxy;
-  insert: EmptyChainProxy;
-  update: EmptyChainProxy;
-  delete: EmptyChainProxy;
-  eq: EmptyChainProxy;
-  neq: EmptyChainProxy;
-  gte: EmptyChainProxy;
-  not: EmptyChainProxy;
-  order: EmptyChainProxy;
-  limit: EmptyChainProxy;
-  single: EmptyPromise;
-  then: undefined;
-  [key: string]: EmptyChainProxy | EmptyPromise | undefined;
-}
-
-interface EmptyChannelProxy {
-  on: EmptyChannelProxy;
-  subscribe: EmptyPromise;
-  then: undefined;
-  [key: string]: EmptyChannelProxy | EmptyPromise | undefined;
-}
-
-interface EmptyClientProxy {
-  from: (table: string) => EmptyTableProxy;
-  auth: {
-    getUser: () => EmptyPromise;
-    signInWithPassword: () => EmptyPromise;
-    signOut: () => EmptyPromise;
-    onAuthStateChange: () => { data: { subscription: { unsubscribe: () => void } } };
-  };
-  channel: (name: string) => EmptyChannelProxy;
-  removeChannel: () => void;
-  then: undefined;
-}
-
-const noop = () => {};
-
-const noopResolve = (data: unknown = null): EmptyPromise =>
-  Promise.resolve({ data, error: null });
-
-const chainProxy: ProxyHandler<EmptyChainProxy> = {
-  get(_, prop) {
-    if (prop === "then") return undefined;
-    return new Proxy(noop as unknown as EmptyChainProxy, chainProxy);
-  },
-};
-
-function getEmptyClient(): EmptyClientProxy {
+function buildEmptyClient() {
   return {
-    from: () =>
-      new Proxy({} as EmptyTableProxy, {
-        get: (_, method) => {
-          if (method === "then") return undefined;
-          if (method === "upsert") return noopResolve([]);
-          return new Proxy(noop as unknown as EmptyChainProxy, chainProxy);
-        },
-      }),
+    from: () => buildChainProxy(),
     auth: {
-      getUser: () => noopResolve({ user: null }),
-      signInWithPassword: () => noopResolve({ user: null }),
-      signOut: () => noopResolve(),
+      getUser: () => ok({ user: null }),
+      signInWithPassword: () => ok({ user: null }),
+      signOut: () => ok(),
       onAuthStateChange: () => ({
-        data: { subscription: { unsubscribe: noop } },
+        data: { subscription: { unsubscribe: () => {} } },
       }),
     },
-    channel: () =>
-      new Proxy({} as EmptyChannelProxy, {
-        get: () => new Proxy(noop as unknown as EmptyChainProxy, chainProxy),
-      }),
-    removeChannel: noop,
-    then: undefined,
+    channel: () => ({
+      on: () => ({ subscribe: () => {} }),
+    }),
+    removeChannel: () => {},
   };
 }
 
 let _client: ReturnType<typeof createBrowserClient> | null = null;
 
 export function createClient() {
-  if (typeof window === "undefined") return getEmptyClient();
+  if (typeof window === "undefined") return buildEmptyClient();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -115,7 +76,7 @@ export function createClient() {
     url === "your-supabase-url" ||
     key === "your-supabase-anon-key"
   ) {
-    return getEmptyClient();
+    return buildEmptyClient();
   }
 
   if (!_client) {
