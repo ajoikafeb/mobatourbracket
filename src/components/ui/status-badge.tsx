@@ -11,20 +11,18 @@ interface StatusBadgeProps {
 const statusConfig = {
   waiting: {
     label: "Waiting",
-    dotClass: "bg-zinc-400",
-    containerClass:
-      "border-zinc-500/30 bg-zinc-500/20 text-zinc-400",
+    dotClass: "bg-zinc-500",
+    containerClass: "border-zinc-500/20 bg-zinc-500/10 text-zinc-400",
   },
   live: {
     label: "Live",
     dotClass: "bg-red-500",
-    containerClass: "border-red-500/30 bg-red-500/20 text-red-400",
+    containerClass: "border-red-500/25 bg-red-500/10 text-red-400",
   },
   finished: {
     label: "Finished",
     dotClass: "bg-green-500",
-    containerClass:
-      "border-green-500/30 bg-green-500/20 text-green-400",
+    containerClass: "border-green-500/25 bg-green-500/10 text-green-400",
   },
 };
 
@@ -34,7 +32,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium",
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium tracking-wide",
         config.containerClass,
         className
       )}
@@ -42,9 +40,9 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       <span className="relative flex h-2 w-2">
         {status === "live" && (
           <motion.span
-            className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"
-            animate={{ scale: [1, 1.8, 1], opacity: [0.75, 0, 0.75] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+            className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60"
+            animate={{ scale: [1, 2, 1], opacity: [0.6, 0, 0.6] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           />
         )}
         <span

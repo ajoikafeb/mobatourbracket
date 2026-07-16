@@ -1,7 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Skeleton } from "@/components/ui/skeleton";
+
+function Skeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-xl bg-white/[0.04] border border-white/[0.04] ${className || ""}`}
+    />
+  );
+}
 
 export function LoadingSkeleton() {
   return (
