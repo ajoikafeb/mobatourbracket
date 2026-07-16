@@ -1,6 +1,6 @@
 import type { Settings, Match, Team, TournamentState } from "@/lib/types";
 import type { EngineBracket, EngineMatch, EngineTeam, EngineRound } from "./types";
-import { getRoundName, ROUND_ORDER } from "./types";
+import { getRoundName } from "./types";
 import { determineBracketSize, computeStats } from "./bracket-engine";
 import { mapTeamFromDB } from "./mapping";
 
@@ -43,21 +43,14 @@ function emptyBracket(): EngineBracket {
   };
 }
 
-/** Derive tournament_state from the existing tournament_status column. */
 function deriveTournamentState(settings: Settings): TournamentState {
   if (settings.tournament_status === "completed") return "completed";
   if (settings.tournament_status === "ongoing") return "running";
   return "draft";
 }
 
-/**
- * Derive current_round_order from match data.
- * Current round = first round where NOT all matches are finished.
- * If all rounds complete → last round index.
- */
 function deriveCurrentRoundOrder(matches: Match[]): number {
   if (matches.length === 0) return 0;
-
   const roundOrders = [...new Set(matches.map((m) => m.round_order))].sort((a, b) => a - b);
   if (roundOrders.length === 0) return 0;
 
@@ -70,6 +63,12 @@ function deriveCurrentRoundOrder(matches: Match[]): number {
   return roundOrders[roundOrders.length - 1];
 }
 
+function getLastRoundWithMatches(matches: Match[]): number {
+  if (matches.length === 0) return 0;
+  const roundOrders = [...new Set(matches.map((m) => m.round_order))].sort((a, b) => a - b);
+  return roundOrders[roundOrders.length - 1] ?? 0;
+}
+
 // ── Pure Read Operations ──────────────────────────────────
 
 export function getBracketSize(teamCount: number): number {
@@ -78,10 +77,6 @@ export function getBracketSize(teamCount: number): number {
 
 export function getTotalRounds(bracketSize: number): number {
   return Math.log2(bracketSize);
-}
-
-export function getRoundNameLocal(bracketSize: number, roundOrder: number): string {
-  return getRoundName(bracketSize, roundOrder);
 }
 
 export function getCurrentRoundName(settings: Settings, matches: Match[]): string {
@@ -124,24 +119,18 @@ export function canProceedToNextRound(settings: Settings, matches: Match[]): boo
   if (state !== "running") return false;
   const bracketSize = getBracketSizeFromMatches(matches);
   const totalRounds = getTotalRounds(bracketSize);
-  const currentRound = deriveCurrentRoundOrder(matches);
+  const lastRound = getLastRoundWithMatches(matches);
 
-  if (currentRound >= totalRounds - 1) return false;
+  if (lastRound >= totalRounds - 1) return false;
 
-  // Button shows when the round BEFORE the current round is complete
-  // (i.e. previous round done → "Start Next Round" appears to advance)
-  if (currentRound > 0) {
-    return isRoundNComplete(matches, currentRound - 1);
-  }
-
-  // First round: button shows when the first round itself is complete
-  return isRoundNComplete(matches, 0);
+  return isRoundNComplete(matches, lastRound);
 }
 
 export function canFinishTournament(settings: Settings, matches: Match[]): boolean {
   const state = deriveTournamentState(settings);
   if (state !== "running") return false;
-  return isRoundComplete(settings, matches) && !canProceedToNextRound(settings, matches);
+  const lastRound = getLastRoundWithMatches(matches);
+  return isRoundNComplete(matches, lastRound) && !canProceedToNextRound(settings, matches);
 }
 
 export function getCurrentMatchFromSettings(settings: Settings, matches: Match[]): Match | null {
@@ -157,52 +146,41 @@ export function findChampion(matches: Match[], teams: Team[]): Team | null {
   return teams.find((t) => t.id === grandFinal.winner_id) || null;
 }
 
-/** Find all placements from round data. Returns array of { rank, team }. */
 export function findPlacements(matches: Match[], teams: Team[], topN: number): { rank: number; team: Team | null }[] {
   const results: { rank: number; team: Team | null }[] = [];
   const teamMap = new Map(teams.map((t) => [t.id, t]));
 
-  // 1st = Grand Final winner
   const gf = matches.find((m) => m.round === "Grand Final" && m.status === "finished");
   if (gf?.winner_id) {
     results.push({ rank: 1, team: teamMap.get(gf.winner_id) || null });
   } else {
     results.push({ rank: 1, team: null });
   }
-
   if (topN <= 1) return results;
 
-  // 2nd = Grand Final loser
   if (gf) {
     const loserId = gf.winner_id === gf.team_a_id ? gf.team_b_id : gf.team_a_id;
     results.push({ rank: 2, team: loserId ? teamMap.get(loserId) || null : null });
   } else {
     results.push({ rank: 2, team: null });
   }
-
   if (topN <= 2) return results;
 
-  // 3rd = Semi Final losers
   const sfMatches = matches.filter((m) => m.round === "Semi Final" && m.status === "finished");
   const sfLosers = sfMatches.map((m) => {
     const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
     return loserId ? teamMap.get(loserId) || null : null;
   });
-
-  // 3rd and 4th from SF losers
   for (let i = 0; i < Math.min(sfLosers.length, topN - 2); i++) {
     results.push({ rank: 3 + i, team: sfLosers[i] });
   }
-
   if (topN <= 4) return results;
 
-  // 5th-8th = Quarter Final losers
   const qfMatches = matches.filter((m) => m.round === "Quarter Final" && m.status === "finished");
   const qfLosers = qfMatches.map((m) => {
     const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
     return loserId ? teamMap.get(loserId) || null : null;
   });
-
   for (let i = 0; i < Math.min(qfLosers.length, topN - 4); i++) {
     results.push({ rank: 5 + i, team: qfLosers[i] });
   }
@@ -339,6 +317,9 @@ type SupabaseClient = {
     update: (data: Record<string, unknown>) => {
       eq: (col: string, val: unknown) => Promise<{ error: unknown }>;
     };
+    insert: (data: Record<string, unknown> | Record<string, unknown>[]) => {
+      select: () => Promise<{ error: unknown }>;
+    };
     select: () => {
       eq: (col: string, val: unknown) => {
         single: () => Promise<{ data: Match | null; error: unknown }>;
@@ -383,6 +364,64 @@ export async function setCurrentMatchId(
     .update({ current_match_id: matchId })
     .eq("id", settingsId);
   return error ? new Error(String(error)) : null;
+}
+
+export async function createNextRoundMatches(
+  supabase: SupabaseClient,
+  settings: Settings,
+  matches: Match[]
+): Promise<Error | null> {
+  const bracketSize = getBracketSizeFromMatches(matches);
+  const totalRounds = getTotalRounds(bracketSize);
+  const lastRound = getLastRoundWithMatches(matches);
+  const nextRound = lastRound + 1;
+
+  if (nextRound >= totalRounds) {
+    return new Error("No next round available");
+  }
+
+  const lastRoundMatches = matches
+    .filter((m) => m.round_order === lastRound && m.status === "finished")
+    .sort((a, b) => a.match_index - b.match_index);
+
+  if (lastRoundMatches.length === 0) {
+    return new Error("No finished matches in current round");
+  }
+
+  const nextRoundName = getRoundName(bracketSize, nextRound);
+  const nextMatchCount = Math.ceil(lastRoundMatches.length / 2);
+  const newMatches: Record<string, unknown>[] = [];
+
+  for (let i = 0; i < nextMatchCount; i++) {
+    const teamAMatch = lastRoundMatches[i * 2];
+    const teamBMatch = lastRoundMatches[i * 2 + 1];
+
+    newMatches.push({
+      team_a: teamAMatch?.winner || "",
+      team_a_id: teamAMatch?.winner_id || null,
+      team_b: teamBMatch?.winner || "",
+      team_b_id: teamBMatch?.winner_id || null,
+      score_a: 0,
+      score_b: 0,
+      status: "waiting",
+      round: nextRoundName,
+      round_order: nextRound,
+      match_index: i,
+      match_date: new Date().toISOString(),
+      best_of: settings.best_of,
+      winner: null,
+      winner_id: null,
+      bracket_slot: null,
+    });
+  }
+
+  const { error } = await supabase
+    .from("matches")
+    .insert(newMatches)
+    .select();
+
+  if (error) return new Error(String(error));
+  return null;
 }
 
 export async function saveMatchResult(

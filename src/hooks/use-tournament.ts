@@ -13,6 +13,7 @@ import {
   startTournament,
   finishTournament,
   setCurrentMatchId,
+  createNextRoundMatches,
   type TournamentSnapshot,
   type RoundProgress,
 } from "@/engine/tournament-service";
@@ -146,14 +147,16 @@ export function useTournament() {
     if (!settings || !snapshot?.canProceedToNextRound) return;
     setActionLoading(true);
     try {
-      showMsg(`Advanced to ${snapshot.currentRoundName}!`);
+      const err = await createNextRoundMatches(supabaseRef.current, settings, matches);
+      if (err) throw err;
+      showMsg(`${snapshot.currentRoundName} matches created!`);
     } catch (err) {
-      console.error("Error advancing round:", err);
-      showMsg("Error advancing round.");
+      console.error("Error creating next round:", err);
+      showMsg("Error creating next round.");
     } finally {
       setActionLoading(false);
     }
-  }, [settings, snapshot, showMsg]);
+  }, [settings, snapshot, matches, showMsg]);
 
   const doFinishTournament = useCallback(async () => {
     if (!settings) return;

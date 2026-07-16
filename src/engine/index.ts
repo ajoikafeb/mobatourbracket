@@ -69,6 +69,7 @@ export {
   startTournament,
   finishTournament,
   setCurrentMatchId,
+  createNextRoundMatches,
   saveMatchResult,
   resetMatchResult,
   resetAllMatches,
