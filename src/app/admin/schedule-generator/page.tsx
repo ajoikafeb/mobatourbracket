@@ -197,7 +197,6 @@ export default function ScheduleGeneratorPage() {
       if (settingsRow) {
         await supabase.from("settings").update({
           tournament_status: "upcoming",
-          current_match_id: null,
         }).eq("id", settingsRow.id);
       }
       const matchInserts = schedule

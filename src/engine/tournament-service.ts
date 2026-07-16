@@ -355,15 +355,11 @@ export async function finishTournament(
 }
 
 export async function setCurrentMatchId(
-  supabase: SupabaseClient,
-  settingsId: string,
-  matchId: string | null
+  _supabase: SupabaseClient,
+  _settingsId: string,
+  _matchId: string | null
 ): Promise<Error | null> {
-  const { error } = await supabase
-    .from("settings")
-    .update({ current_match_id: matchId })
-    .eq("id", settingsId);
-  return error ? new Error(String(error)) : null;
+  return null;
 }
 
 export async function createNextRoundMatches(
@@ -550,7 +546,6 @@ export async function resetAllMatches(
     .from("settings")
     .update({
       tournament_status: "upcoming",
-      current_match_id: null,
     })
     .eq("id", settingsId);
   if (settingsErr) return new Error(String(settingsErr));

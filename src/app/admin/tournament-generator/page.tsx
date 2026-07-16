@@ -231,7 +231,6 @@ export default function TournamentGeneratorPage() {
         .from("settings")
         .update({
           tournament_status: "upcoming",
-          current_match_id: null,
         })
         .eq("id", settings?.id || "");
       if (settingsErr) throw settingsErr;
