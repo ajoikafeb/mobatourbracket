@@ -1,20 +1,15 @@
 {
   "name": "Neosoul Tournament Tracker",
   "short_name": "Neosoul",
-  "description": "Community Mobile MOBA Tournament Tracker",
+  "description": "Indonesian Community Tournament Tracker - Track brackets, schedules, and live matches.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090B",
   "theme_color": "#FF7A00",
   "icons": [
     {
-      "src": "/assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/assets/icon-512.png",
-      "sizes": "512x512",
+      "src": "/logo.png",
+      "sizes": "any",
       "type": "image/png"
     }
   ]

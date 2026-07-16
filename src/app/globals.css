@@ -31,6 +31,7 @@
 
 *::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 *::-webkit-scrollbar-track {
@@ -40,6 +41,10 @@
 *::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 html {
@@ -104,7 +109,66 @@ body {
   animation: shimmer 2s infinite;
 }
 
+@keyframes pulse-live {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
+}
+
+.pulse-live {
+  animation: pulse-live 2s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
 select option {
   background: #18181B;
   color: white;
+}
+
+/* Horizontal scroll styling for bracket */
+.bracket-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.bracket-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 122, 0, 0.3);
+  border-radius: 4px;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 122, 0, 0.5);
+}
+
+/* Bottom sheet drag handle */
+.drag-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
 }

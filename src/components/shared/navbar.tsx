@@ -46,7 +46,7 @@ export function Navbar() {
               alt="Neosoul"
               width={902}
               height={322}
-              className="h-8 md:h-9 w-auto max-w-[min(52vw,220px)] sm:max-w-[280px] object-contain object-left transition-opacity group-hover:opacity-90"
+              className="h-10 md:h-[46px] lg:h-[52px] w-auto max-w-[min(52vw,220px)] sm:max-w-[280px] object-contain object-left transition-opacity group-hover:opacity-90"
               priority
               quality={100}
               sizes="(max-width: 767px) min(52vw, 220px), 280px"

@@ -16,14 +16,18 @@ import {
   X,
   ChevronLeft,
   Loader2,
+  Wand2,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const sidebarLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/bracket", label: "Bracket", icon: Swords },
-  { href: "/admin/schedule", label: "Schedule", icon: Calendar },
+  { href: "/admin/tournament-generator", label: "Tournament Generator", icon: Wand2, highlight: true },
+  { href: "/admin/schedule-generator", label: "Schedule Generator", icon: Sparkles },
+  { href: "/admin/bracket", label: "Bracket Editor", icon: Swords },
+  { href: "/admin/schedule", label: "Schedule Editor", icon: Calendar },
   { href: "/admin/current-match", label: "Current Match", icon: Radio },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
@@ -84,7 +88,7 @@ export default function AdminLayout({
           <span className="text-sm font-bold text-white">Admin Panel</span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {sidebarLinks.map((link) => {
             const isActive = pathname === link.href;
             const Icon = link.icon;
@@ -96,6 +100,8 @@ export default function AdminLayout({
                   "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                    : link.highlight
+                    ? "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/5"
                     : "text-zinc-400 hover:text-white hover:bg-white/5"
                 )}
               >
@@ -155,7 +161,7 @@ export default function AdminLayout({
               className="lg:hidden fixed inset-0 z-50 bg-[#09090B]/95 backdrop-blur-xl"
             >
               <div className="flex flex-col h-full pt-16 pb-6 px-4">
-                <nav className="flex-1 space-y-1">
+                <nav className="flex-1 space-y-1 overflow-y-auto">
                   {sidebarLinks.map((link) => {
                     const isActive = pathname === link.href;
                     const Icon = link.icon;
@@ -168,6 +174,8 @@ export default function AdminLayout({
                           "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
                           isActive
                             ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                            : link.highlight
+                            ? "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/5"
                             : "text-zinc-400 hover:text-white hover:bg-white/5"
                         )}
                       >

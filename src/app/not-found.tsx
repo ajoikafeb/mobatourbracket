@@ -15,32 +15,38 @@ export default function NotFound() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 text-center"
+        transition={{ duration: 0.5 }}
+        className="relative z-10 text-center max-w-md"
       >
-        <Card className="p-12 sm:p-16 max-w-lg">
+        <Card className="p-10">
           <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mb-6"
           >
-            <h1 className="text-8xl sm:text-9xl font-black bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent mb-4">
+            <span className="text-8xl font-black bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
               404
-            </h1>
+            </span>
           </motion.div>
-          <h2 className="text-xl font-bold text-white mb-3">
-            Page Not Found
-          </h2>
-          <p className="text-zinc-400 mb-8">
-            The page you are looking for does not exist or has been moved.
+
+          <h1 className="text-xl font-bold text-white mb-2">Page Not Found</h1>
+          <p className="text-sm text-zinc-400 mb-8">
+            The page you&apos;re looking for doesn&apos;t exist or has been moved.
           </p>
-          <div className="flex items-center justify-center gap-4">
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/">
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Home className="h-4 w-4" />
-                Go Home
+                Back to Home
               </Button>
             </Link>
-            <Button variant="outline" onClick={() => window.history.back()}>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => window.history.back()}
+            >
               <ArrowLeft className="h-4 w-4" />
               Go Back
             </Button>
