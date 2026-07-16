@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Loader2, Wand2, Trophy } from "lucide-react";
+import { Swords, Loader2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,90 @@ import {
   type EngineBracket,
   type EngineTeam,
 } from "@/engine";
-import { ROUND_CONFIG } from "@/lib/types";
+
+async function syncBracketsAfterSave(
+  match: EngineMatch,
+  winnerId: string | null,
+  supabase: ReturnType<typeof createClient>
+) {
+  if (!winnerId) return;
+
+  const currentRoundOrder = match.roundOrder;
+  const matchIndex = match.matchIndex;
+
+  const { data: currentSlots } = await supabase
+    .from("brackets")
+    .select("id, position, team_id")
+    .eq("round_order", currentRoundOrder);
+
+  if (!currentSlots) return;
+
+  const slotA = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2);
+  const slotB = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2 + 1);
+
+  if (slotA) {
+    await supabase
+      .from("brackets")
+      .update({ is_winner: slotA.team_id === winnerId })
+      .eq("id", slotA.id);
+  }
+  if (slotB) {
+    await supabase
+      .from("brackets")
+      .update({ is_winner: slotB.team_id === winnerId })
+      .eq("id", slotB.id);
+  }
+
+  const nextRoundOrder = currentRoundOrder + 1;
+  const nextSlotPosition = Math.floor(matchIndex / 2) * 2 + (matchIndex % 2 === 0 ? 0 : 1);
+  const winnerTeam = match.teamA?.id === winnerId ? match.teamA : match.teamB;
+
+  if (winnerTeam) {
+    await supabase
+      .from("brackets")
+      .update({
+        team_name: winnerTeam.name,
+        team_seed: winnerTeam.seed,
+        team_id: winnerTeam.id,
+      })
+      .eq("round_order", nextRoundOrder)
+      .eq("position", nextSlotPosition);
+  }
+}
+
+async function syncBracketsAfterReset(
+  match: EngineMatch,
+  supabase: ReturnType<typeof createClient>
+) {
+  const currentRoundOrder = match.roundOrder;
+  const matchIndex = match.matchIndex;
+
+  const { data: currentSlots } = await supabase
+    .from("brackets")
+    .select("id, position")
+    .eq("round_order", currentRoundOrder);
+
+  if (!currentSlots) return;
+
+  const slotA = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2);
+  const slotB = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2 + 1);
+
+  if (slotA) {
+    await supabase.from("brackets").update({ is_winner: false }).eq("id", slotA.id);
+  }
+  if (slotB) {
+    await supabase.from("brackets").update({ is_winner: false }).eq("id", slotB.id);
+  }
+
+  const nextRoundOrder = currentRoundOrder + 1;
+  const nextSlotPosition = Math.floor(matchIndex / 2) * 2 + (matchIndex % 2 === 0 ? 0 : 1);
+
+  await supabase
+    .from("brackets")
+    .update({ team_name: "", team_seed: 0, team_id: null })
+    .eq("round_order", nextRoundOrder)
+    .eq("position", nextSlotPosition);
+}
 
 export default function AdminBracketPage() {
   const { brackets: dbBrackets, loading: bracketsLoading, refetch: refetchBrackets } = useBrackets();
@@ -66,8 +149,11 @@ export default function AdminBracketPage() {
     const bracket = generateBracket(sortedTeams, "imported", bestOf);
 
     for (const em of engineMatches) {
-      const existing = bracket.matches.find((m) => m.id === em.id);
+      const existing = bracket.matches.find(
+        (m) => m.round === em.round && m.matchIndex === em.matchIndex
+      );
       if (existing) {
+        existing.id = em.id;
         existing.teamA = em.teamA;
         existing.teamB = em.teamB;
         existing.scoreA = em.scoreA;
@@ -121,14 +207,13 @@ export default function AdminBracketPage() {
           if (error) throw error;
         }
 
-        setEngineBracket({ ...engineBracket!, stats: computeStats(engineBracket!.matches) });
+        await syncBracketsAfterSave(match, winnerId, supabase);
 
-        await refetchMatches();
-        await refetchBrackets();
+        await Promise.all([refetchMatches(), refetchBrackets()]);
 
         setMessage("Match saved successfully!");
         setTimeout(() => setMessage(""), 2000);
-      } catch (err) {
+      } catch {
         setMessage("Error saving match.");
         setTimeout(() => setMessage(""), 3000);
       } finally {
@@ -151,8 +236,12 @@ export default function AdminBracketPage() {
           await supabase.from("matches").update(dbRow).eq("id", m.id);
         }
 
-        setEngineBracket({ ...engineBracket, stats: computeStats(engineBracket.matches) });
-        await refetchMatches();
+        await syncBracketsAfterReset(
+          engineBracket.matches.find((m) => m.id === matchId)!,
+          supabase
+        );
+
+        await Promise.all([refetchMatches(), refetchBrackets()]);
 
         setMessage("Match reset successfully!");
         setTimeout(() => setMessage(""), 2000);
@@ -163,7 +252,7 @@ export default function AdminBracketPage() {
         setSaving(false);
       }
     },
-    [engineBracket, supabase, refetchMatches]
+    [engineBracket, supabase, refetchMatches, refetchBrackets]
   );
 
   const handleUndo = useCallback(() => {}, []);
@@ -191,9 +280,17 @@ export default function AdminBracketPage() {
         await supabase.from("matches").update(dbRow).eq("id", m.id);
       }
 
-      setEngineBracket({ ...engineBracket, stats: computeStats(engineBracket.matches) });
-      await refetchMatches();
-      await refetchBrackets();
+      await supabase
+        .from("brackets")
+        .update({ is_winner: false })
+        .eq("is_winner", true);
+
+      await supabase
+        .from("brackets")
+        .update({ team_name: "", team_seed: 0, team_id: null })
+        .gt("round_order", 0);
+
+      await Promise.all([refetchMatches(), refetchBrackets()]);
 
       setMessage("All matches reset!");
       setTimeout(() => setMessage(""), 2000);
