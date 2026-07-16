@@ -403,9 +403,22 @@ export default function TournamentGeneratorPage() {
     setSuccess("");
 
     try {
-      await supabase.from("teams").delete().neq("id", "");
-      await supabase.from("brackets").delete().neq("id", "");
-      await supabase.from("matches").delete().neq("id", "");
+      // Delete existing data
+      const { data: existingTeams } = await supabase.from("teams").select("id");
+      if (existingTeams && existingTeams.length > 0) {
+        const ids: string[] = existingTeams.map((t: { id: string }) => t.id);
+        await supabase.from("teams").delete().in("id", ids);
+      }
+      const { data: existingBrackets } = await supabase.from("brackets").select("id");
+      if (existingBrackets && existingBrackets.length > 0) {
+        const ids: string[] = existingBrackets.map((b: { id: string }) => b.id);
+        await supabase.from("brackets").delete().in("id", ids);
+      }
+      const { data: existingMatches } = await supabase.from("matches").select("id");
+      if (existingMatches && existingMatches.length > 0) {
+        const ids: string[] = existingMatches.map((m: { id: string }) => m.id);
+        await supabase.from("matches").delete().in("id", ids);
+      }
 
       const teamRows: Omit<Team, "id" | "created_at" | "updated_at">[] =
         teams.map((t, i) => ({

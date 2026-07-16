@@ -129,11 +129,12 @@ export default function AdminBracketPage() {
     setSaving(true);
     setMessage("");
     try {
-      const { error: delErr } = await supabase
-        .from("brackets")
-        .delete()
-        .neq("id", "");
-      if (delErr) throw delErr;
+      const { data: existingBrackets } = await supabase.from("brackets").select("id");
+      if (existingBrackets && existingBrackets.length > 0) {
+        const ids: string[] = existingBrackets.map((b: { id: string }) => b.id);
+        const { error: delErr } = await supabase.from("brackets").delete().in("id", ids);
+        if (delErr) throw delErr;
+      }
 
       const toUpsert = editBrackets
         .filter((b) => b.team_name)
