@@ -193,6 +193,13 @@ export default function ScheduleGeneratorPage() {
       }
 
       await supabase.from("matches").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      const { data: settingsRow } = await supabase.from("settings").select("id").limit(1).single();
+      if (settingsRow) {
+        await supabase.from("settings").update({
+          tournament_status: "upcoming",
+          current_match_id: null,
+        }).eq("id", settingsRow.id);
+      }
       const matchInserts = schedule
         .filter((m) => m.awayTeam !== "BYE")
         .map((m) => ({

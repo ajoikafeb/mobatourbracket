@@ -227,6 +227,15 @@ export default function TournamentGeneratorPage() {
             em.map((r: { id: string }) => r.id)
           );
 
+      const { error: settingsErr } = await supabase
+        .from("settings")
+        .update({
+          tournament_status: "upcoming",
+          current_match_id: null,
+        })
+        .eq("id", settings?.id || "");
+      if (settingsErr) throw settingsErr;
+
       const teamRows = teams.map((t) => mapTeamToDB(t));
       const { data: savedTeams, error: teamErr } = await supabase
         .from("teams")
