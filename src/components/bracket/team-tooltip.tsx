@@ -17,10 +17,10 @@ export function TeamTooltip({ team, position }: TeamTooltipProps) {
     let x = position.x;
     let y = position.y;
 
-    if (x + 180 > vw) x = vw - 190;
+    if (x + 200 > vw) x = vw - 210;
     if (x < 10) x = 10;
-    if (y - 200 < 0) y = position.y + 40;
-    else y = position.y - 10;
+    if (y - 220 < 0) y = position.y + 20;
+    else y = position.y - 20;
 
     setAdjustedPos({ x, y });
   }, [position]);

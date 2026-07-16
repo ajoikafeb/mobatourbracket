@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import type { EngineMatch, EngineTeam } from "@/engine/types";
 import { TeamTooltip } from "./team-tooltip";
@@ -140,8 +141,9 @@ function TeamRow({
         </span>
       </div>
 
-      {showTooltip && team && !isBye && (
-        <TeamTooltip team={team} position={tooltipPos} />
+      {showTooltip && team && !isBye && createPortal(
+        <TeamTooltip team={team} position={tooltipPos} />,
+        document.body
       )}
     </div>
   );
