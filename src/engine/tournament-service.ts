@@ -284,7 +284,7 @@ export function reconstructBracketFromDB(
 
       const engineMatch: EngineMatch = {
         id: dbMatch.id,
-        round: dbMatch.round as EngineMatch["round"],
+        round: getRoundName(bracketSize, roundIdx),
         roundOrder: roundIdx,
         matchIndex: dbMatch.match_index,
         matchNumber: matchNumber++,
