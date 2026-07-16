@@ -36,7 +36,7 @@ export function Navbar() {
         transition={{ duration: 0.5 }}
         className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#09090B]/80 backdrop-blur-2xl"
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8" style={{ height: "auto", minHeight: "80px" }}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8" style={{ height: "auto", minHeight: "64px" }}>
           <Link
             href="/"
             className="flex items-center py-2 pr-4 transition-transform duration-200 hover:scale-105 hover:drop-shadow-[0_0_12px_rgba(249,115,22,0.45)]"
@@ -44,12 +44,12 @@ export function Navbar() {
             <Image
               src="/logo.png"
               alt="Neosoul"
-              width={210}
-              height={70}
-              className="h-[50px] w-auto sm:h-[60px] md:h-[70px] object-contain"
+              width={902}
+              height={322}
+              className="h-8 md:h-9 w-auto max-w-[min(52vw,220px)] sm:max-w-[280px] object-contain object-left transition-opacity group-hover:opacity-90"
               priority
               quality={100}
-              sizes="(max-width: 639px) 50px, (max-width: 767px) 60px, 70px"
+              sizes="(max-width: 767px) min(52vw, 220px), 280px"
             />
           </Link>
 
