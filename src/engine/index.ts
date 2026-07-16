@@ -1,9 +1,11 @@
 export type {
   EnginePlayer,
   EngineTeam,
-  EngineBracketSlot,
   EngineMatch,
+  EngineRound,
   EngineBracket,
+  EngineBracketStats,
+  EngineBracketConfig,
   MatchStatus,
   SeedingMode,
   RoundName,
@@ -14,9 +16,10 @@ export type {
   TournamentValidation,
   ValidationError,
   ValidationWarning,
+  BracketValidation,
 } from "./types";
 
-export { ROUND_ORDER } from "./types";
+export { ROUND_ORDER, getRoundName } from "./types";
 
 export { generateId } from "./utils";
 export { parsePlayers } from "./player-parser";
@@ -24,12 +27,20 @@ export { generateTeams } from "./team-generator";
 export { generateSeedOrder, applySeeding } from "./seeding";
 export {
   determineBracketSize,
-  getRoundsForBracket,
   generateBracket,
-} from "./bracket-generator";
+  computeStats,
+} from "./bracket-engine";
 export { generateSchedule } from "./schedule-generator";
-export { advanceWinner } from "./winner-progression";
-export type { WinnerProgressionResult } from "./winner-progression";
+export { advanceWinner, resetMatch, resetRound } from "./advancement";
+export type { AdvancementResult } from "./advancement";
+export {
+  swapTeams,
+  replaceTeam,
+  deleteTeamFromMatch,
+  updateMatchScore,
+  updateMatchStatus,
+  resetEntireBracket,
+} from "./mutations";
 export { validateTournament } from "./validation";
 export { HistoryManager } from "./history";
 export type { HistoryEntry } from "./history";
@@ -39,5 +50,4 @@ export {
   mapTeamFromDB,
   mapMatchToDB,
   mapMatchFromDB,
-  mapBracketToDB,
 } from "./mapping";

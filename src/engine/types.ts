@@ -1,4 +1,4 @@
-export type MatchStatus = "waiting" | "live" | "finished";
+export type MatchStatus = "waiting" | "upcoming" | "live" | "finished" | "cancelled";
 export type SeedingMode = "random" | "manual" | "imported";
 
 export interface EnginePlayer {
@@ -12,20 +12,7 @@ export interface EngineTeam {
   players: EnginePlayer[];
   seed: number;
   logo: string | null;
-}
-
-export interface EngineBracketSlot {
-  id: string;
-  round: RoundName;
-  roundOrder: number;
-  position: number;
-  teamId: string | null;
-  teamName: string;
-  teamSeed: number;
-  isBye: boolean;
-  isWinner: boolean;
-  matchId: string | null;
-  nextSlotId: string | null;
+  isEliminated: boolean;
 }
 
 export interface EngineMatch {
@@ -33,30 +20,48 @@ export interface EngineMatch {
   round: RoundName;
   roundOrder: number;
   matchIndex: number;
-  slotAId: string;
-  slotBId: string;
-  teamAId: string | null;
-  teamBId: string | null;
-  teamAName: string;
-  teamBName: string;
+  matchNumber: number;
+  teamA: EngineTeam | null;
+  teamB: EngineTeam | null;
   scoreA: number;
   scoreB: number;
   status: MatchStatus;
   winnerId: string | null;
-  winnerName: string | null;
+  loserId: string | null;
+  scheduledTime: string | null;
   bestOf: number;
-  bracketSlot: number;
-  startTime: string | null;
-  endTime: string | null;
+  nextMatchId: string | null;
+  nextSlot: "A" | "B" | null;
+}
+
+export interface EngineRound {
+  name: RoundName;
+  order: number;
+  matches: EngineMatch[];
 }
 
 export interface EngineBracket {
-  slots: EngineBracketSlot[];
+  teams: EngineTeam[];
+  rounds: EngineRound[];
   matches: EngineMatch[];
-  rounds: RoundName[];
+  champion: EngineTeam | null;
+  stats: EngineBracketStats;
+  config: EngineBracketConfig;
+}
+
+export interface EngineBracketStats {
+  totalMatches: number;
+  completedMatches: number;
+  liveMatches: number;
+  waitingMatches: number;
+  progress: number;
+}
+
+export interface EngineBracketConfig {
   bracketSize: number;
-  totalTeams: number;
   totalByes: number;
+  bestOf: number;
+  seedingMode: SeedingMode;
 }
 
 export type RoundName =
@@ -78,19 +83,18 @@ export const ROUND_ORDER: RoundName[] = [
   "Champion",
 ];
 
-export interface TournamentConfig {
-  playersPerTeam: number;
-  bestOf: number;
-  seedingMode: SeedingMode;
-  manualSeeds?: Record<string, number>;
-}
-
-export interface ScheduleConfig {
-  startDate: string;
-  startTime: string;
-  matchDurationMinutes: number;
-  breakDurationMinutes: number;
-  timezone: string;
+export function getRoundName(bracketSize: number, roundIndex: number): RoundName {
+  const totalRounds = Math.log2(bracketSize);
+  const allRounds: RoundName[] = [
+    "Round of 64",
+    "Round of 32",
+    "Round of 16",
+    "Quarter Final",
+    "Semi Final",
+    "Grand Final",
+  ];
+  const startIdx = totalRounds - 1 - roundIndex;
+  return allRounds[Math.max(0, Math.min(startIdx, allRounds.length - 1))] || "Grand Final";
 }
 
 export interface PlayerImportResult {
@@ -106,6 +110,21 @@ export interface TeamGenerationResult {
   teamCount: number;
   assignedCount: number;
   remainingCount: number;
+}
+
+export interface TournamentConfig {
+  playersPerTeam: number;
+  bestOf: number;
+  seedingMode: SeedingMode;
+  manualSeeds?: Record<string, number>;
+}
+
+export interface ScheduleConfig {
+  startDate: string;
+  startTime: string;
+  matchDurationMinutes: number;
+  breakDurationMinutes: number;
+  timezone: string;
 }
 
 export interface TournamentValidation {
@@ -124,4 +143,10 @@ export interface ValidationWarning {
   type: string;
   message: string;
   details?: string;
+}
+
+export interface BracketValidation {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
 }

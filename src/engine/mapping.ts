@@ -1,10 +1,9 @@
-import type { EngineTeam, EngineMatch, EngineBracketSlot } from "./types";
-import type { Team, Match, Bracket } from "@/lib/types";
+import type { EngineTeam, EngineMatch } from "./types";
+import type { Team, Match } from "@/lib/types";
 
 export function mapTeamToDB(team: EngineTeam): Record<string, unknown> {
   const players = team.players.map((p) => p.username);
   return {
-    id: team.id,
     team_name: team.name,
     logo: team.logo,
     captain: players[0] || "",
@@ -19,7 +18,7 @@ export function mapTeamToDB(team: EngineTeam): Record<string, unknown> {
   };
 }
 
-export function mapTeamFromDB(team: Team): EngineTeam {
+export function mapTeamFromDB(team: Team, isEliminated: boolean = false): EngineTeam {
   const players: { username: string; originalIndex: number }[] = [];
   const fields = [
     team.player_1,
@@ -41,27 +40,31 @@ export function mapTeamFromDB(team: Team): EngineTeam {
     players,
     seed: team.seed,
     logo: team.logo,
+    isEliminated,
   };
 }
 
 export function mapMatchToDB(match: EngineMatch): Record<string, unknown> {
   return {
-    id: match.id,
-    team_a: match.teamAName,
-    team_b: match.teamBName,
-    team_a_id: match.teamAId,
-    team_b_id: match.teamBId,
+    team_a: match.teamA?.name || "",
+    team_a_id: match.teamA?.id || null,
+    team_b: match.teamB?.name || "",
+    team_b_id: match.teamB?.id || null,
     score_a: match.scoreA,
     score_b: match.scoreB,
-    status: match.status,
+    status: match.status === "upcoming" ? "waiting" : match.status,
     round: match.round,
     round_order: match.roundOrder,
     match_index: match.matchIndex,
-    match_date: match.startTime || new Date().toISOString(),
+    match_date: match.scheduledTime || new Date().toISOString(),
     best_of: match.bestOf,
-    winner: match.winnerName,
+    winner: match.winnerId
+      ? match.teamA?.id === match.winnerId
+        ? match.teamA?.name
+        : match.teamB?.name
+      : null,
     winner_id: match.winnerId,
-    bracket_slot: match.bracketSlot,
+    bracket_slot: match.matchIndex,
   };
 }
 
@@ -71,37 +74,35 @@ export function mapMatchFromDB(match: Match): EngineMatch {
     round: match.round as EngineMatch["round"],
     roundOrder: match.round_order,
     matchIndex: match.match_index,
-    slotAId: "",
-    slotBId: "",
-    teamAId: match.team_a_id,
-    teamBId: match.team_b_id,
-    teamAName: match.team_a,
-    teamBName: match.team_b,
+    matchNumber: match.match_index + 1,
+    teamA: match.team_a
+      ? {
+          id: match.team_a_id || "",
+          name: match.team_a,
+          players: [],
+          seed: 0,
+          logo: null,
+          isEliminated: match.winner_id != null && match.winner_id !== match.team_a_id,
+        }
+      : null,
+    teamB: match.team_b
+      ? {
+          id: match.team_b_id || "",
+          name: match.team_b,
+          players: [],
+          seed: 0,
+          logo: null,
+          isEliminated: match.winner_id != null && match.winner_id !== match.team_b_id,
+        }
+      : null,
     scoreA: match.score_a,
     scoreB: match.score_b,
-    status: match.status,
+    status: match.status as EngineMatch["status"],
     winnerId: match.winner_id,
-    winnerName: match.winner,
+    loserId: null,
+    scheduledTime: match.match_date,
     bestOf: match.best_of,
-    bracketSlot: match.bracket_slot ?? match.match_index,
-    startTime: match.match_date,
-    endTime: null,
-  };
-}
-
-export function mapBracketToDB(
-  slot: EngineBracketSlot
-): Record<string, unknown> {
-  return {
-    round: slot.round,
-    round_order: slot.roundOrder,
-    position: slot.position,
-    team_name: slot.teamName,
-    team_seed: slot.teamSeed,
-    team_id: slot.teamId || null,
-    is_bye: slot.isBye,
-    is_winner: slot.isWinner || false,
-    is_current: false,
-    match_id: null,
+    nextMatchId: null,
+    nextSlot: null,
   };
 }

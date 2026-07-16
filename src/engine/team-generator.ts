@@ -19,6 +19,7 @@ export function generateTeams(
       players: teamPlayers,
       seed: i + 1,
       logo: null,
+      isEliminated: false,
     });
   }
 

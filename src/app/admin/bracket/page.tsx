@@ -1,164 +1,215 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import {
-  Swords, Save, Loader2, Trophy, Users, ChevronDown,
-  ChevronUp, Trash2, Plus, Wand2,
-} from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Swords, Loader2, Wand2, Trophy } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
+import { EmptyState } from "@/components/shared/empty-state";
 import { useBrackets } from "@/hooks/use-brackets";
 import { useTeams } from "@/hooks/use-teams";
+import { useMatches } from "@/hooks/use-matches";
+import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
-import { Bracket, RoundName, ROUND_ORDER, ROUND_CONFIG } from "@/lib/types";
-
-const ROUND_SLOTS: Record<RoundName, number> = {
-  "Round of 64": 64,
-  "Round of 32": 32,
-  "Round of 16": 16,
-  "Quarter Final": 8,
-  "Semi Final": 4,
-  "Grand Final": 2,
-  Champion: 1,
-};
-
-function makeBracket(round: RoundName, position: number, id?: string): Bracket {
-  return {
-    id: id ?? `new-${round}-${position}`,
-    round,
-    round_order: ROUND_ORDER.indexOf(round),
-    position,
-    team_name: "",
-    team_seed: 0,
-    team_id: null,
-    opponent_id: null,
-    match_id: null,
-    is_winner: false,
-    is_current: false,
-    is_bye: false,
-    created_at: "",
-    updated_at: "",
-  };
-}
-
-function buildEmptyBrackets(): Bracket[] {
-  const out: Bracket[] = [];
-  let pos = 0;
-  for (const round of ROUND_ORDER) {
-    for (let i = 0; i < ROUND_SLOTS[round]; i++) {
-      out.push(makeBracket(round, pos++));
-    }
-  }
-  return out;
-}
+import { BracketView } from "@/components/bracket/bracket-view";
+import { MatchEditor } from "@/components/admin/match-editor";
+import { BracketToolbar } from "@/components/admin/bracket-toolbar";
+import {
+  generateBracket,
+  computeStats,
+  advanceWinner,
+  resetMatch as engineResetMatch,
+  mapTeamFromDB,
+  mapMatchFromDB,
+  mapMatchToDB,
+  type EngineMatch,
+  type EngineBracket,
+  type EngineTeam,
+} from "@/engine";
+import { ROUND_CONFIG } from "@/lib/types";
 
 export default function AdminBracketPage() {
-  const { brackets, loading: bracketsLoading, refetch } = useBrackets();
-  const { teams, loading: teamsLoading } = useTeams();
-  const [editBrackets, setEditBrackets] = useState<Bracket[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const { brackets: dbBrackets, loading: bracketsLoading, refetch: refetchBrackets } = useBrackets();
+  const { teams: dbTeams, loading: teamsLoading } = useTeams();
+  const { matches: dbMatches, loading: matchesLoading, refetch: refetchMatches } = useMatches();
+  const { settings } = useSettings();
+
+  const [engineBracket, setEngineBracket] = useState<EngineBracket | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<EngineMatch | null>(null);
+  const [hoveredTeamId, setHoveredTeamId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [expandedRound, setExpandedRound] = useState<string | null>(null);
+
   const supabase = createClient();
-  const loading = bracketsLoading || teamsLoading;
+  const loading = bracketsLoading || teamsLoading || matchesLoading;
+
+  const engineTeams = useMemo(() => {
+    return dbTeams.map((t) => mapTeamFromDB(t));
+  }, [dbTeams]);
+
+  const engineMatches = useMemo(() => {
+    return dbMatches.map((m) => mapMatchFromDB(m));
+  }, [dbMatches]);
 
   useEffect(() => {
-    if (loading || initialized) return;
-    setEditBrackets(brackets.length === 0 ? buildEmptyBrackets() : [...brackets]);
-    setInitialized(true);
-  }, [loading, initialized, brackets]);
+    if (loading || engineTeams.length === 0) return;
+    if (dbBrackets.length === 0) {
+      setEngineBracket(null);
+      return;
+    }
 
-  if (loading) return <LoadingSkeleton />;
+    const bestOf = settings?.best_of || 3;
 
-  const activeRounds = ROUND_ORDER.filter((r) =>
-    editBrackets.some((b) => b.round === r),
-  );
-  const totalFilled = editBrackets.filter((b) => b.team_name).length;
+    const sortedTeams = [...engineTeams].sort((a, b) => a.seed - b.seed);
+    const bracket = generateBracket(sortedTeams, "imported", bestOf);
 
-  function updateBracket(
-    id: string,
-    field: keyof Bracket,
-    value: string | number | boolean | null,
-  ) {
-    setEditBrackets((prev) =>
-      prev.map((b) => {
-        if (b.id !== id) return b;
-        const next = { ...b, [field]: value };
-        if (field === "team_id" && value) {
-          const team = teams.find((t) => t.id === value);
-          if (team) next.team_name = team.team_name;
+    for (const em of engineMatches) {
+      const existing = bracket.matches.find((m) => m.id === em.id);
+      if (existing) {
+        existing.teamA = em.teamA;
+        existing.teamB = em.teamB;
+        existing.scoreA = em.scoreA;
+        existing.scoreB = em.scoreB;
+        existing.status = em.status;
+        existing.winnerId = em.winnerId;
+        existing.loserId = em.loserId;
+        existing.scheduledTime = em.scheduledTime;
+      }
+    }
+
+    bracket.stats = computeStats(bracket.matches);
+
+    setEngineBracket(bracket);
+  }, [loading, engineTeams, engineMatches, dbBrackets, settings]);
+
+  const handleMatchClick = useCallback((match: EngineMatch) => {
+    setSelectedMatch(match);
+  }, []);
+
+  const handleMatchSave = useCallback(
+    async (
+      matchId: string,
+      scoreA: number,
+      scoreB: number,
+      winnerId: string | null,
+      status: EngineMatch["status"]
+    ) => {
+      setSaving(true);
+      try {
+        const match = engineBracket?.matches.find((m) => m.id === matchId);
+        if (!match) return;
+
+        if (scoreA > scoreB) winnerId = match.teamA?.id || null;
+        else if (scoreB > scoreA) winnerId = match.teamB?.id || null;
+
+        if (winnerId) {
+          advanceWinner(matchId, winnerId, engineBracket!.matches);
+        } else {
+          match.scoreA = scoreA;
+          match.scoreB = scoreB;
+          match.status = status;
         }
-        if (field === "team_name" && value) next.team_id = null;
-        return next;
-      }),
-    );
-  }
 
-  function clearTeam(id: string) {
-    setEditBrackets((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, team_id: null, team_name: "", team_seed: 0 } : b,
-      ),
-    );
-  }
+        for (const m of engineBracket!.matches) {
+          const dbRow = mapMatchToDB(m);
+          const { error } = await supabase
+            .from("matches")
+            .update(dbRow)
+            .eq("id", m.id);
+          if (error) throw error;
+        }
 
-  function addRoundSlots(round: RoundName) {
-    const existing = editBrackets.filter((b) => b.round === round).length;
-    const toAdd = ROUND_SLOTS[round] - existing;
-    if (toAdd <= 0) return;
-    const maxPos = editBrackets.reduce((m, b) => Math.max(m, b.position), -1);
-    const newSlots = Array.from({ length: toAdd }, (_, i) =>
-      makeBracket(round, maxPos + 1 + i),
-    );
-    setEditBrackets((prev) => [...prev, ...newSlots]);
-  }
+        setEngineBracket({ ...engineBracket!, stats: computeStats(engineBracket!.matches) });
 
-  function removeRound(round: RoundName) {
-    setEditBrackets((prev) => prev.filter((b) => b.round !== round));
-    if (expandedRound === round) setExpandedRound(null);
-  }
+        await refetchMatches();
+        await refetchBrackets();
 
-  async function handleSave() {
+        setMessage("Match saved successfully!");
+        setTimeout(() => setMessage(""), 2000);
+      } catch (err) {
+        setMessage("Error saving match.");
+        setTimeout(() => setMessage(""), 3000);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [engineBracket, supabase, refetchMatches, refetchBrackets]
+  );
+
+  const handleMatchReset = useCallback(
+    async (matchId: string) => {
+      if (!engineBracket) return;
+      setSaving(true);
+      try {
+        engineResetMatch(matchId, engineBracket.matches);
+
+        for (const m of engineBracket.matches) {
+          if (m.roundOrder === 0) continue;
+          const dbRow = mapMatchToDB(m);
+          await supabase.from("matches").update(dbRow).eq("id", m.id);
+        }
+
+        setEngineBracket({ ...engineBracket, stats: computeStats(engineBracket.matches) });
+        await refetchMatches();
+
+        setMessage("Match reset successfully!");
+        setTimeout(() => setMessage(""), 2000);
+      } catch {
+        setMessage("Error resetting match.");
+        setTimeout(() => setMessage(""), 3000);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [engineBracket, supabase, refetchMatches]
+  );
+
+  const handleUndo = useCallback(() => {}, []);
+  const handleRedo = useCallback(() => {}, []);
+
+  const handleResetAll = useCallback(async () => {
+    if (!engineBracket) return;
+    if (!confirm("Reset all match results? This cannot be undone.")) return;
+
     setSaving(true);
-    setMessage("");
     try {
-      const { data: existingBrackets } = await supabase.from("brackets").select("id");
-      if (existingBrackets && existingBrackets.length > 0) {
-        const ids: string[] = existingBrackets.map((b: { id: string }) => b.id);
-        const { error: delErr } = await supabase.from("brackets").delete().in("id", ids);
-        if (delErr) throw delErr;
+      for (const m of engineBracket.matches) {
+        m.winnerId = null;
+        m.loserId = null;
+        m.scoreA = 0;
+        m.scoreB = 0;
+        m.status = m.roundOrder === 0 ? "waiting" : "waiting";
+
+        if (m.roundOrder > 0) {
+          m.teamA = null;
+          m.teamB = null;
+        }
+
+        const dbRow = mapMatchToDB(m);
+        await supabase.from("matches").update(dbRow).eq("id", m.id);
       }
 
-      const toUpsert = editBrackets
-        .filter((b) => b.team_name)
-        .map(({ id, ...rest }) => ({
-          ...rest,
-          ...(id.startsWith("new-") ? {} : { id }),
-        }));
+      setEngineBracket({ ...engineBracket, stats: computeStats(engineBracket.matches) });
+      await refetchMatches();
+      await refetchBrackets();
 
-      if (toUpsert.length > 0) {
-        const { error } = await supabase
-          .from("brackets")
-          .upsert(toUpsert, { onConflict: "id" });
-        if (error) throw error;
-      }
-
-      await refetch();
-      setMessage("Bracket saved successfully!");
-      setTimeout(() => setMessage(""), 3000);
+      setMessage("All matches reset!");
+      setTimeout(() => setMessage(""), 2000);
     } catch {
-      setMessage("Error saving bracket. Please try again.");
+      setMessage("Error resetting bracket.");
+      setTimeout(() => setMessage(""), 3000);
     } finally {
       setSaving(false);
     }
-  }
+  }, [engineBracket, supabase, refetchMatches, refetchBrackets]);
+
+  const handleRegenerate = useCallback(() => {
+    window.location.href = "/admin/tournament-generator";
+  }, []);
+
+  if (loading) return <LoadingSkeleton />;
 
   return (
     <div className="min-h-screen bg-zinc-950 p-6 space-y-6">
@@ -170,22 +221,17 @@ export default function AdminBracketPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Bracket Editor</h1>
             <p className="text-sm text-zinc-400">
-              <Users className="inline h-3.5 w-3.5 mr-1" />
-              {teams.length} teams · {totalFilled}/{editBrackets.length} slots filled
+              Click any match to edit scores and set winners
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/admin/generate">
+          <Link href="/admin/tournament-generator">
             <Button variant="outline" className="gap-2 border-zinc-700 text-zinc-300 hover:text-white">
               <Wand2 className="h-4 w-4" />
-              Generate from players
+              Generate New
             </Button>
           </Link>
-          <Button onClick={handleSave} disabled={saving} className="bg-orange-500 hover:bg-orange-600 text-white">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save
-          </Button>
         </div>
       </div>
 
@@ -197,193 +243,69 @@ export default function AdminBracketPage() {
             "rounded-xl px-4 py-3 text-sm",
             message.includes("Error")
               ? "border border-red-500/30 bg-red-500/10 text-red-400"
-              : "border border-green-500/30 bg-green-500/10 text-green-400",
+              : "border border-green-500/30 bg-green-500/10 text-green-400"
           )}
         >
           {message}
         </motion.div>
       )}
 
-      <div className="space-y-4">
-        {activeRounds.map((round, ri) => {
-          const roundBrackets = editBrackets
-            .filter((b) => b.round === round)
-            .sort((a, b) => a.position - b.position);
-          const isExpanded = expandedRound === round;
-          const filledCount = roundBrackets.filter((b) => b.team_name).length;
-          const cfg = ROUND_CONFIG[round];
+      {engineBracket && engineBracket.matches.length > 0 ? (
+        <>
+          <BracketToolbar
+            stats={engineBracket.stats}
+            canUndo={false}
+            canRedo={false}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onResetAll={handleResetAll}
+            onRegenerate={handleRegenerate}
+          />
 
-          return (
-            <motion.div
-              key={round}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: ri * 0.05 }}
-            >
-              <Card className="overflow-hidden border-white/[0.06] bg-white/[0.03] backdrop-blur">
-                <button
-                  onClick={() => setExpandedRound(isExpanded ? null : round)}
-                  className="flex items-center justify-between w-full p-5 hover:bg-white/[0.02] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {round === "Champion" && (
-                      <Trophy className="h-5 w-5 text-orange-400" />
-                    )}
-                    <h3 className="text-sm font-semibold text-white">
-                      {cfg?.label ?? round}
-                    </h3>
-                    <span className="text-xs text-zinc-500">
-                      {roundBrackets.length} slots · {filledCount} filled
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeRound(round); }}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                    {isExpanded
-                      ? <ChevronUp className="h-4 w-4 text-zinc-500" />
-                      : <ChevronDown className="h-4 w-4 text-zinc-500" />}
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="border-t border-white/[0.06]"
-                  >
-                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {roundBrackets.map((bracket) => {
-                        const linkedTeam = bracket.team_id
-                          ? teams.find((t) => t.id === bracket.team_id)
-                          : null;
-                        return (
-                          <div
-                            key={bracket.id}
-                            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-zinc-600 font-medium">
-                                Slot #{bracket.position + 1}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => updateBracket(bracket.id, "is_winner", !bracket.is_winner)}
-                                  className={cn(
-                                    "flex h-6 w-6 items-center justify-center rounded-lg border transition-colors",
-                                    bracket.is_winner
-                                      ? "border-orange-500/30 bg-orange-500/20 text-orange-400"
-                                      : "border-white/[0.06] bg-white/5 text-zinc-600 hover:text-white",
-                                  )}
-                                >
-                                  <Trophy className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={() => updateBracket(bracket.id, "is_current", !bracket.is_current)}
-                                  className={cn(
-                                    "flex h-6 w-6 items-center justify-center rounded-lg border transition-colors",
-                                    bracket.is_current
-                                      ? "border-red-500/30 bg-red-500/20"
-                                      : "border-white/[0.06] bg-white/5",
-                                  )}
-                                >
-                                  <span className={cn(
-                                    "h-2 w-2 rounded-full",
-                                    bracket.is_current ? "bg-red-400" : "bg-zinc-600",
-                                  )} />
-                                </button>
-                              </div>
-                            </div>
-
-                            <Select
-                              value={bracket.team_id || ""}
-                              onChange={(e) => updateBracket(bracket.id, "team_id", e.target.value || null)}
-                              className="h-9 text-xs"
-                            >
-                              <option value="">Select team...</option>
-                              {teams.map((team) => (
-                                <option key={team.id} value={team.id}>{team.team_name}</option>
-                              ))}
-                            </Select>
-
-                            <Input
-                              placeholder="Or type team name..."
-                              value={bracket.team_id ? "" : bracket.team_name}
-                              onChange={(e) => updateBracket(bracket.id, "team_name", e.target.value)}
-                              className="h-9 text-xs"
-                            />
-
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={bracket.team_seed}
-                                placeholder="Seed"
-                                className="h-8 text-[10px]"
-                                onChange={(e) => updateBracket(bracket.id, "team_seed", parseInt(e.target.value) || 0)}
-                              />
-                              {bracket.team_name && (
-                                <button
-                                  onClick={() => clearTeam(bracket.id)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </div>
-
-                            {linkedTeam && (
-                              <div className="flex items-center gap-1.5 text-[10px] text-orange-400">
-                                <Users className="h-3 w-3" />
-                                <span className="truncate">
-                                  {linkedTeam.captain
-                                    ? `Captain: ${linkedTeam.captain}`
-                                    : "Linked to team"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="px-5 pb-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addRoundSlots(round)}
-                        className="gap-1.5 border-dashed border-zinc-700 text-zinc-400 hover:text-white"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add slot
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-              </Card>
-            </motion.div>
-          );
-        })}
-
-        {activeRounds.length === 0 && (
-          <Card className="flex flex-col items-center justify-center p-16 border-white/[0.06] bg-white/[0.03]">
-            <Swords className="h-10 w-10 text-zinc-600 mb-3" />
-            <p className="text-zinc-400 text-sm mb-4">
-              No rounds yet. Generate a bracket to get started.
-            </p>
-          <Link href="/admin/tournament-generator">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+            <BracketView
+              bracket={engineBracket}
+              onMatchClick={handleMatchClick}
+              hoveredTeamId={hoveredTeamId}
+              onTeamHover={setHoveredTeamId}
+              isAdmin
+            />
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          icon={Swords}
+          title="No bracket yet"
+          description="Generate a tournament bracket to get started."
+          action={
+            <Link href="/admin/tournament-generator">
               <Button className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
                 <Wand2 className="h-4 w-4" />
-                Generate from players
+                Generate Bracket
               </Button>
             </Link>
-          </Card>
+          }
+        />
+      )}
+
+      <AnimatePresence>
+        {selectedMatch && (
+          <MatchEditor
+            key={selectedMatch.id}
+            match={selectedMatch}
+            onClose={() => setSelectedMatch(null)}
+            onSave={handleMatchSave}
+            onReset={handleMatchReset}
+          />
         )}
-      </div>
+      </AnimatePresence>
+
+      {saving && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141416]/95 backdrop-blur-xl px-4 py-2.5 shadow-2xl">
+          <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
+          <span className="text-xs text-zinc-300">Saving...</span>
+        </div>
+      )}
     </div>
   );
 }

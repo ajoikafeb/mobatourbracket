@@ -5,7 +5,13 @@ export function generateSchedule(
   config: ScheduleConfig
 ): EngineMatch[] {
   const scheduled = matches
-    .filter((m) => m.teamAName && m.teamBName && m.teamAName !== "BYE" && m.teamBName !== "BYE")
+    .filter(
+      (m) =>
+        m.teamA &&
+        m.teamB &&
+        m.teamA.name !== "BYE" &&
+        m.teamB.name !== "BYE"
+    )
     .sort((a, b) => {
       if (a.roundOrder !== b.roundOrder) return a.roundOrder - b.roundOrder;
       return a.matchIndex - b.matchIndex;
@@ -20,9 +26,8 @@ export function generateSchedule(
   const breakMs = config.breakDurationMinutes * 60 * 1000;
 
   for (const match of scheduled) {
-    match.startTime = new Date(currentTime).toISOString();
+    match.scheduledTime = new Date(currentTime).toISOString();
     currentTime += slotMs;
-    match.endTime = new Date(currentTime).toISOString();
     currentTime += breakMs;
   }
 

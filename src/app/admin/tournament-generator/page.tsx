@@ -36,7 +36,6 @@ import {
   validateTournament,
   determineBracketSize,
   mapTeamToDB,
-  mapBracketToDB,
   mapMatchToDB,
   type EngineTeam,
   type SeedingMode,
@@ -168,6 +167,7 @@ export default function TournamentGeneratorPage() {
         players: [],
         seed: prev.length + 1,
         logo: null,
+        isEliminated: false,
       },
     ]);
   }
@@ -252,17 +252,42 @@ export default function TournamentGeneratorPage() {
         settings?.best_of || 3
       );
 
-      const bracketRows = bracket.slots.map((s) => mapBracketToDB(s));
+      const bracketRows: Record<string, unknown>[] = [];
+      for (const match of bracket.matches) {
+        if (match.teamA) {
+          bracketRows.push({
+            round: match.round,
+            round_order: match.roundOrder,
+            position: match.matchIndex * 2,
+            team_name: match.teamA.name,
+            team_seed: match.teamA.seed,
+            team_id: idMap.get(match.teamA.id) || match.teamA.id,
+            is_bye: match.teamA.name === "BYE",
+            is_winner: match.winnerId === match.teamA.id,
+            is_current: false,
+            match_id: null,
+          });
+        }
+        if (match.teamB) {
+          bracketRows.push({
+            round: match.round,
+            round_order: match.roundOrder,
+            position: match.matchIndex * 2 + 1,
+            team_name: match.teamB.name,
+            team_seed: match.teamB.seed,
+            team_id: idMap.get(match.teamB.id) || match.teamB.id,
+            is_bye: match.teamB.name === "BYE",
+            is_winner: match.winnerId === match.teamB.id,
+            is_current: false,
+            match_id: null,
+          });
+        }
+      }
+
       if (bracketRows.length > 0) {
-        const finalBracketRows = bracketRows.map((r) => ({
-          ...r,
-          team_id: r.team_id
-            ? idMap.get(r.team_id as string) || r.team_id
-            : null,
-        }));
         const { error: bErr } = await supabase
           .from("brackets")
-          .insert(finalBracketRows);
+          .insert(bracketRows);
         if (bErr) throw bErr;
       }
 

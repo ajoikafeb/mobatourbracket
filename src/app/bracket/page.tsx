@@ -1,16 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Swords,
-  Trophy,
-  ChevronRight,
-  X,
-  Star,
-  Zap,
-  ArrowRight,
-} from "lucide-react";
+import { Swords, Trophy, X, Star, ChevronRight } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
 import { AnimatedBackground } from "@/components/shared/animated-background";
@@ -22,7 +14,7 @@ import { useBracketsWithTeams } from "@/hooks/use-brackets";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import type { BracketWithTeam, Team } from "@/lib/types";
-import { ROUND_CONFIG, ROUND_ORDER } from "@/lib/types";
+import { ROUND_ORDER, ROUND_CONFIG } from "@/lib/types";
 
 function getInitials(name: string) {
   return name
@@ -57,38 +49,26 @@ function getActiveRounds(brackets: BracketWithTeam[]) {
   return ROUND_ORDER.filter((name) => activeRoundNames.has(name));
 }
 
-function getTeamCardSpacing(bracket: BracketWithTeam, roundIndex: number) {
-  const order = ROUND_ORDER.indexOf(bracket.round as (typeof ROUND_ORDER)[number]);
-  if (order <= 2) return "mb-3";
-  if (order <= 4) return "mb-6";
-  return "mb-12";
-}
-
 function TeamCard({
   bracket,
   onHover,
   onClick,
   isHovered,
   isSelected,
-  roundIndex,
 }: {
   bracket: BracketWithTeam;
   onHover: (bracket: BracketWithTeam | null) => void;
-  onClick: (bracket: BracketWithTeam, el: HTMLDivElement) => void;
+  onClick: (bracket: BracketWithTeam) => void;
   isHovered: boolean;
   isSelected: boolean;
-  roundIndex: number;
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
   const team = bracket.team;
   const isChampion = bracket.round === "Champion";
   const isEmpty = !bracket.team_name;
   const isBye = bracket.is_bye;
-  const spacing = getTeamCardSpacing(bracket, roundIndex);
 
   return (
     <motion.div
-      ref={cardRef}
       initial={{ opacity: 0, x: -15 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
@@ -96,9 +76,12 @@ function TeamCard({
       onMouseLeave={() => onHover(null)}
       onClick={() => {
         if (isEmpty || isBye) return;
-        onClick(bracket, cardRef.current!);
+        onClick(bracket);
       }}
-      className={cn("relative", (isEmpty || isBye) ? "" : "cursor-pointer", spacing)}
+      className={cn(
+        "relative mb-3 last:mb-0",
+        (isEmpty || isBye) ? "" : "cursor-pointer"
+      )}
     >
       <motion.div
         whileHover={isEmpty || isBye ? {} : { scale: 1.03, y: -2 }}
@@ -174,9 +157,7 @@ function TeamCard({
                     bracket.is_winner ? "text-orange-400" : "text-zinc-500"
                   )}
                 >
-                  {isBye
-                    ? "B"
-                    : getInitials(bracket.team_name || "TBD")}
+                  {isBye ? "B" : getInitials(bracket.team_name || "TBD")}
                 </span>
               )}
             </div>
@@ -215,9 +196,7 @@ function TeamCard({
                   : "text-white"
               )}
             >
-              {isBye
-                ? "BYE"
-                : bracket.team_name || "TBD"}
+              {isBye ? "BYE" : bracket.team_name || "TBD"}
             </p>
             {bracket.team_seed > 0 && !isEmpty && !isBye && (
               <p className="text-[9px] text-zinc-500 mt-0.5 sm:text-[10px]">
@@ -303,16 +282,14 @@ function BracketRound({
   onTeamClick,
   hoveredId,
   selectedId,
-  roundIndex,
 }: {
   roundName: string;
   teams: BracketWithTeam[];
   delay: number;
   onTeamHover: (bracket: BracketWithTeam | null) => void;
-  onTeamClick: (bracket: BracketWithTeam, el: HTMLDivElement) => void;
+  onTeamClick: (bracket: BracketWithTeam) => void;
   hoveredId: string | null;
   selectedId: string | null;
-  roundIndex: number;
 }) {
   const config = ROUND_CONFIG[roundName] || { label: roundName, shortLabel: roundName };
   const isChampion = roundName === "Champion";
@@ -329,7 +306,7 @@ function BracketRound({
       >
         <div className="text-center mb-2">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-orange-400 sm:text-sm">
-            <Zap className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <Trophy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             {config.shortLabel}
           </span>
         </div>
@@ -360,7 +337,6 @@ function BracketRound({
               onClick={onTeamClick}
               isHovered={hoveredId === bracket.id}
               isSelected={selectedId === bracket.id}
-              roundIndex={roundIndex}
             />
           ))
         ) : (
@@ -370,21 +346,6 @@ function BracketRound({
         )}
       </div>
     </motion.div>
-  );
-}
-
-function RoundConnector({ roundIndex }: { roundIndex: number }) {
-  return (
-    <div className="flex flex-col items-center justify-center self-stretch px-1">
-      <motion.div
-        initial={{ opacity: 0, scaleX: 0 }}
-        animate={{ opacity: 1, scaleX: 1 }}
-        transition={{ duration: 0.4, delay: roundIndex * 0.1 + 0.2 }}
-        className="w-6 sm:w-10 flex items-center justify-center"
-      >
-        <ArrowRight className="h-4 w-4 text-zinc-700 sm:h-5 sm:w-5" />
-      </motion.div>
-    </div>
   );
 }
 
@@ -549,7 +510,7 @@ export default function BracketPage() {
   }, []);
 
   const handleClick = useCallback(
-    (bracket: BracketWithTeam, _el: HTMLDivElement) => {
+    (bracket: BracketWithTeam) => {
       if (selectedBracket?.id === bracket.id) {
         setSelectedBracket(null);
       } else {
@@ -606,7 +567,19 @@ export default function BracketPage() {
                   {groupedRounds.map((round, i) => (
                     <div key={round.name} className="contents">
                       {i > 0 && (
-                        <RoundConnector roundIndex={i - 1} />
+                        <div className="flex flex-col items-center justify-center self-stretch px-1">
+                          <motion.div
+                            initial={{ opacity: 0, scaleX: 0 }}
+                            animate={{ opacity: 1, scaleX: 1 }}
+                            transition={{ duration: 0.4, delay: i * 0.1 + 0.2 }}
+                            className="w-6 sm:w-10 flex items-center justify-center"
+                          >
+                            <svg width="40" height="20" className="text-zinc-700">
+                              <line x1="0" y1="10" x2="40" y2="10" stroke="currentColor" strokeWidth="1.5" />
+                              <polygon points="35,5 40,10 35,15" fill="currentColor" />
+                            </svg>
+                          </motion.div>
+                        </div>
                       )}
                       <BracketRound
                         roundName={round.name}
@@ -616,7 +589,6 @@ export default function BracketPage() {
                         onTeamClick={handleClick}
                         hoveredId={hoveredBracket?.id || null}
                         selectedId={selectedBracket?.id || null}
-                        roundIndex={i}
                       />
                     </div>
                   ))}
@@ -661,23 +633,6 @@ export default function BracketPage() {
       </AnimatePresence>
 
       <Footer />
-
-      <style jsx global>{`
-        .scrollbar-thin::-webkit-scrollbar {
-          height: 6px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.02);
-          border-radius: 3px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.08);
-          border-radius: 3px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.15);
-        }
-      `}</style>
     </div>
   );
 }
