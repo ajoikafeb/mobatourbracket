@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Settings, Match, Team, TournamentState } from "@/lib/types";
+import type { Settings, Match, Team } from "@/lib/types";
 import type { EngineBracket } from "@/engine/types";
 import {
   buildTournamentSnapshot,
@@ -11,7 +11,6 @@ import {
   resetMatchResult,
   resetAllMatches,
   startTournament,
-  proceedToNextRound,
   finishTournament,
   setCurrentMatchId,
   type TournamentSnapshot,
@@ -137,7 +136,7 @@ export function useTournament() {
       showMsg("Tournament started!");
     } catch (err) {
       console.error("Error starting tournament:", err);
-      showMsg("Error starting tournament.");
+      showMsg("Error starting tournament. Make sure you have matches generated.");
     } finally {
       setActionLoading(false);
     }
@@ -147,8 +146,6 @@ export function useTournament() {
     if (!settings || !snapshot?.canProceedToNextRound) return;
     setActionLoading(true);
     try {
-      const err = await proceedToNextRound(supabaseRef.current, settings.id, settings.current_round_order);
-      if (err) throw err;
       showMsg("Advanced to next round!");
     } catch (err) {
       console.error("Error advancing round:", err);

@@ -15,68 +15,19 @@ import {
   Settings,
   Wand2,
   Play,
-  ChevronRight,
   RotateCcw,
   Flag,
+  ChevronRight,
+  Award,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useTournament } from "@/hooks/use-tournament";
 import { cn } from "@/lib/utils";
-import type { Match, TournamentState } from "@/lib/types";
+import type { Match } from "@/lib/types";
 
-const STATE_LABELS: Record<TournamentState, { label: string; color: string; bg: string }> = {
-  draft: { label: "Draft", color: "text-zinc-400", bg: "bg-zinc-500/20 border-zinc-500/30" },
-  ready: { label: "Ready", color: "text-blue-400", bg: "bg-blue-500/20 border-blue-500/30" },
-  running: { label: "Running", color: "text-green-400", bg: "bg-green-500/20 border-green-500/30" },
-  completed: { label: "Completed", color: "text-purple-400", bg: "bg-purple-500/20 border-purple-500/30" },
-};
-
-const quickActions = [
-  {
-    href: "/admin/tournament-generator",
-    label: "Tournament Generator",
-    icon: Wand2,
-    color: "bg-orange-500/20 text-orange-400",
-    highlight: true,
-  },
-  {
-    href: "/admin/schedule-generator",
-    label: "Schedule Generator",
-    icon: Calendar,
-    color: "bg-blue-500/20 text-blue-400",
-    highlight: false,
-  },
-  {
-    href: "/admin/bracket",
-    label: "Edit Bracket",
-    icon: Swords,
-    color: "bg-orange-500/20 text-orange-400",
-    highlight: false,
-  },
-  {
-    href: "/admin/current-match",
-    label: "Current Match",
-    icon: Radio,
-    color: "bg-red-500/20 text-red-400",
-    highlight: false,
-  },
-  {
-    href: "/admin/schedule",
-    label: "Edit Schedule",
-    icon: Clock,
-    color: "bg-green-500/20 text-green-400",
-    highlight: false,
-  },
-  {
-    href: "/admin/settings",
-    label: "Settings",
-    icon: Settings,
-    color: "bg-purple-500/20 text-purple-400",
-    highlight: false,
-  },
-];
+const ROUND_ICONS = [Swords, Zap, Swords, Flag, Trophy, Award];
 
 function ProgressBar({ percentage }: { percentage: number }) {
   return (
@@ -87,6 +38,46 @@ function ProgressBar({ percentage }: { percentage: number }) {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
       />
+    </div>
+  );
+}
+
+function RoundTrack({ rounds, currentRound, matches }: { rounds: string[]; currentRound: number; matches: Match[] }) {
+  return (
+    <div className="flex items-center gap-1 overflow-x-auto py-2">
+      {rounds.map((name, idx) => {
+        const roundMatches = matches.filter((m) => m.round_order === idx);
+        const allFinished = roundMatches.length > 0 && roundMatches.every((m) => m.status === "finished");
+        const isCurrent = idx === currentRound;
+        const isPast = idx < currentRound;
+
+        return (
+          <div key={name} className="flex items-center gap-1">
+            <div
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all",
+                isCurrent
+                  ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                  : allFinished || isPast
+                  ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                  : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/30"
+              )}
+            >
+              {allFinished || isPast ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : isCurrent ? (
+                <Radio className="h-3 w-3 animate-pulse" />
+              ) : (
+                <Clock className="h-3 w-3" />
+              )}
+              {name}
+            </div>
+            {idx < rounds.length - 1 && (
+              <ChevronRight className="h-3 w-3 text-zinc-600 flex-shrink-0" />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -128,6 +119,7 @@ export default function AdminDashboardPage() {
     actionLoading,
     message,
     tournamentState,
+    currentRoundOrder,
     currentRoundName,
     currentMatch,
     roundProgress,
@@ -135,21 +127,27 @@ export default function AdminDashboardPage() {
     canProceedToNextRound,
     canFinishTournament,
     champion,
+    totalRounds,
     startTournament: doStartTournament,
     proceedToNextRound: doProceedToNextRound,
     finishTournament: doFinishTournament,
     resetAll: doResetAll,
-    setMessage,
   } = useTournament();
 
   const totalMatches = matches.length;
   const liveMatches = matches.filter((m) => m.status === "live").length;
   const finishedMatches = matches.filter((m) => m.status === "finished").length;
   const currentRoundMatches = matches
-    .filter((m) => m.round_order === (settings?.current_round_order || 0))
+    .filter((m) => m.round_order === currentRoundOrder)
     .sort((a, b) => a.match_index - b.match_index);
 
-  const stateInfo = STATE_LABELS[tournamentState] || STATE_LABELS.draft;
+  const roundNames = [...new Set(matches.map((m) => m.round))].sort(
+    (a, b) => {
+      const orderA = matches.find((m) => m.round === a)?.round_order ?? 0;
+      const orderB = matches.find((m) => m.round === b)?.round_order ?? 0;
+      return orderA - orderB;
+    }
+  );
 
   const stats = [
     {
@@ -192,7 +190,7 @@ export default function AdminDashboardPage() {
       >
         <h1 className="text-3xl font-bold text-white">Tournament Control Panel</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Central dashboard — manage tournament state, rounds, and matches
+          Central dashboard — manage tournament flow, rounds, and matches
         </p>
       </motion.div>
 
@@ -221,29 +219,78 @@ export default function AdminDashboardPage() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
-                <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", stateInfo.bg)}>
-                  <Trophy className={cn("h-5 w-5", stateInfo.color)} />
+                <div
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-xl border",
+                    tournamentState === "running"
+                      ? "bg-green-500/20 border-green-500/30"
+                      : tournamentState === "completed"
+                      ? "bg-purple-500/20 border-purple-500/30"
+                      : "bg-zinc-500/20 border-zinc-500/30"
+                  )}
+                >
+                  <Trophy
+                    className={cn(
+                      "h-5 w-5",
+                      tournamentState === "running"
+                        ? "text-green-400"
+                        : tournamentState === "completed"
+                        ? "text-purple-400"
+                        : "text-zinc-400"
+                    )}
+                  />
                 </div>
                 <div>
                   <p className="text-xs text-zinc-500 uppercase tracking-wider">Tournament State</p>
-                  <p className={cn("text-lg font-bold", stateInfo.color)}>{stateInfo.label}</p>
+                  <p
+                    className={cn(
+                      "text-lg font-bold",
+                      tournamentState === "running"
+                        ? "text-green-400"
+                        : tournamentState === "completed"
+                        ? "text-purple-400"
+                        : "text-zinc-400"
+                    )}
+                  >
+                    {tournamentState === "running"
+                      ? "Running"
+                      : tournamentState === "completed"
+                      ? "Completed"
+                      : "Draft"}
+                  </p>
                 </div>
               </div>
 
               {tournamentState === "running" && (
                 <div className="space-y-3">
+                  {/* ── Round Track ──────────────────── */}
+                  {roundNames.length > 0 && (
+                    <RoundTrack
+                      rounds={roundNames}
+                      currentRound={currentRoundOrder}
+                      matches={matches}
+                    />
+                  )}
+
                   <div className="flex items-center gap-4 text-sm">
                     <span className="text-zinc-500">Current Round:</span>
                     <span className="font-semibold text-white">{currentRoundName}</span>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-zinc-500">Progress:</span>
+                    <span className="text-zinc-500">Round Progress:</span>
                     <span className="text-white">
                       {roundProgress.completed}/{roundProgress.total} matches
                     </span>
                     <span className="text-orange-400 font-medium">{roundProgress.percentage}%</span>
                   </div>
                   <ProgressBar percentage={roundProgress.percentage} />
+
+                  {isRoundComplete && canProceedToNextRound && (
+                    <div className="flex items-center gap-2 text-sm text-green-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Round complete — ready for next round!
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -276,18 +323,18 @@ export default function AdminDashboardPage() {
                 </Button>
               )}
 
-              {tournamentState === "running" && canProceedToNextRound && (
+              {tournamentState === "running" && isRoundComplete && canProceedToNextRound && (
                 <Button
                   onClick={doProceedToNextRound}
                   disabled={actionLoading}
-                  className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+                  className="gap-2 bg-orange-600 hover:bg-orange-700 text-white animate-pulse"
                 >
                   <ArrowRight className="h-4 w-4" />
-                  Proceed to Next Round
+                  Start Next Round
                 </Button>
               )}
 
-              {tournamentState === "running" && canFinishTournament && (
+              {tournamentState === "running" && isRoundComplete && canFinishTournament && (
                 <Button
                   onClick={doFinishTournament}
                   disabled={actionLoading}
@@ -296,6 +343,15 @@ export default function AdminDashboardPage() {
                   <Flag className="h-4 w-4" />
                   Finish Tournament
                 </Button>
+              )}
+
+              {tournamentState === "completed" && (
+                <Link href="/admin/announce">
+                  <Button className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
+                    <Award className="h-4 w-4" />
+                    Announce Winner
+                  </Button>
+                </Link>
               )}
 
               {tournamentState !== "draft" && (
@@ -413,7 +469,50 @@ export default function AdminDashboardPage() {
           Quick Actions
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {quickActions.map((action) => {
+          {[
+            {
+              href: "/admin/tournament-generator",
+              label: "Tournament Generator",
+              icon: Wand2,
+              color: "bg-orange-500/20 text-orange-400",
+              highlight: true,
+            },
+            {
+              href: "/admin/schedule-generator",
+              label: "Schedule Generator",
+              icon: Calendar,
+              color: "bg-blue-500/20 text-blue-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/bracket",
+              label: "Edit Bracket",
+              icon: Swords,
+              color: "bg-orange-500/20 text-orange-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/current-match",
+              label: "Current Match",
+              icon: Radio,
+              color: "bg-red-500/20 text-red-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/schedule",
+              label: "Edit Schedule",
+              icon: Clock,
+              color: "bg-green-500/20 text-green-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/settings",
+              label: "Settings",
+              icon: Settings,
+              color: "bg-purple-500/20 text-purple-400",
+              highlight: false,
+            },
+          ].map((action) => {
             const Icon = action.icon;
             return (
               <Link key={action.href} href={action.href}>

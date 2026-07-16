@@ -24,6 +24,52 @@ export interface TournamentSnapshot {
   champion: Team | null;
 }
 
+// ── Helpers ──────────────────────────────────────────────
+
+function getBracketSizeFromMatches(matches: Match[]): number {
+  const round0Count = matches.filter((m) => m.round_order === 0).length;
+  if (round0Count === 0) return 2;
+  return round0Count * 2;
+}
+
+function emptyBracket(): EngineBracket {
+  return {
+    teams: [],
+    rounds: [],
+    matches: [],
+    champion: null,
+    stats: { totalMatches: 0, completedMatches: 0, liveMatches: 0, waitingMatches: 0, progress: 0 },
+    config: { bracketSize: 0, totalByes: 0, bestOf: 3, seedingMode: "imported" },
+  };
+}
+
+/** Derive tournament_state from the existing tournament_status column. */
+function deriveTournamentState(settings: Settings): TournamentState {
+  if (settings.tournament_status === "completed") return "completed";
+  if (settings.tournament_status === "ongoing") return "running";
+  return "draft";
+}
+
+/**
+ * Derive current_round_order from match data.
+ * Current round = first round where NOT all matches are finished.
+ * If all rounds complete → last round index.
+ */
+function deriveCurrentRoundOrder(matches: Match[]): number {
+  if (matches.length === 0) return 0;
+
+  const roundOrders = [...new Set(matches.map((m) => m.round_order))].sort((a, b) => a - b);
+  if (roundOrders.length === 0) return 0;
+
+  for (const roundOrder of roundOrders) {
+    const roundMatches = matches.filter((m) => m.round_order === roundOrder);
+    const allFinished = roundMatches.every((m) => m.status === "finished");
+    if (!allFinished) return roundOrder;
+  }
+
+  return roundOrders[roundOrders.length - 1];
+}
+
 // ── Pure Read Operations ──────────────────────────────────
 
 export function getBracketSize(teamCount: number): number {
@@ -34,10 +80,15 @@ export function getTotalRounds(bracketSize: number): number {
   return Math.log2(bracketSize);
 }
 
+export function getRoundNameLocal(bracketSize: number, roundOrder: number): string {
+  return getRoundName(bracketSize, roundOrder);
+}
+
 export function getCurrentRoundName(settings: Settings, matches: Match[]): string {
   if (matches.length === 0) return "N/A";
   const bracketSize = getBracketSizeFromMatches(matches);
-  return getRoundName(bracketSize, settings.current_round_order);
+  const currentRound = deriveCurrentRoundOrder(matches);
+  return getRoundName(bracketSize, currentRound);
 }
 
 export function getRoundMatches(matches: Match[], roundOrder: number): Match[] {
@@ -47,7 +98,8 @@ export function getRoundMatches(matches: Match[], roundOrder: number): Match[] {
 }
 
 export function getRoundProgress(settings: Settings, matches: Match[]): RoundProgress {
-  const roundMatches = getRoundMatches(matches, settings.current_round_order);
+  const currentRound = deriveCurrentRoundOrder(matches);
+  const roundMatches = getRoundMatches(matches, currentRound);
   const total = roundMatches.length;
   const completed = roundMatches.filter((m) => m.status === "finished").length;
   return {
@@ -63,15 +115,18 @@ export function isRoundComplete(settings: Settings, matches: Match[]): boolean {
 }
 
 export function canProceedToNextRound(settings: Settings, matches: Match[]): boolean {
-  if (settings.tournament_state !== "running") return false;
+  const state = deriveTournamentState(settings);
+  if (state !== "running") return false;
   if (!isRoundComplete(settings, matches)) return false;
   const bracketSize = getBracketSizeFromMatches(matches);
   const totalRounds = getTotalRounds(bracketSize);
-  return settings.current_round_order < totalRounds - 1;
+  const currentRound = deriveCurrentRoundOrder(matches);
+  return currentRound < totalRounds - 1;
 }
 
 export function canFinishTournament(settings: Settings, matches: Match[]): boolean {
-  if (settings.tournament_state !== "running") return false;
+  const state = deriveTournamentState(settings);
+  if (state !== "running") return false;
   return isRoundComplete(settings, matches) && !canProceedToNextRound(settings, matches);
 }
 
@@ -88,6 +143,59 @@ export function findChampion(matches: Match[], teams: Team[]): Team | null {
   return teams.find((t) => t.id === grandFinal.winner_id) || null;
 }
 
+/** Find all placements from round data. Returns array of { rank, team }. */
+export function findPlacements(matches: Match[], teams: Team[], topN: number): { rank: number; team: Team | null }[] {
+  const results: { rank: number; team: Team | null }[] = [];
+  const teamMap = new Map(teams.map((t) => [t.id, t]));
+
+  // 1st = Grand Final winner
+  const gf = matches.find((m) => m.round === "Grand Final" && m.status === "finished");
+  if (gf?.winner_id) {
+    results.push({ rank: 1, team: teamMap.get(gf.winner_id) || null });
+  } else {
+    results.push({ rank: 1, team: null });
+  }
+
+  if (topN <= 1) return results;
+
+  // 2nd = Grand Final loser
+  if (gf) {
+    const loserId = gf.winner_id === gf.team_a_id ? gf.team_b_id : gf.team_a_id;
+    results.push({ rank: 2, team: loserId ? teamMap.get(loserId) || null : null });
+  } else {
+    results.push({ rank: 2, team: null });
+  }
+
+  if (topN <= 2) return results;
+
+  // 3rd = Semi Final losers
+  const sfMatches = matches.filter((m) => m.round === "Semi Final" && m.status === "finished");
+  const sfLosers = sfMatches.map((m) => {
+    const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
+    return loserId ? teamMap.get(loserId) || null : null;
+  });
+
+  // 3rd and 4th from SF losers
+  for (let i = 0; i < Math.min(sfLosers.length, topN - 2); i++) {
+    results.push({ rank: 3 + i, team: sfLosers[i] });
+  }
+
+  if (topN <= 4) return results;
+
+  // 5th-8th = Quarter Final losers
+  const qfMatches = matches.filter((m) => m.round === "Quarter Final" && m.status === "finished");
+  const qfLosers = qfMatches.map((m) => {
+    const loserId = m.winner_id === m.team_a_id ? m.team_b_id : m.team_a_id;
+    return loserId ? teamMap.get(loserId) || null : null;
+  });
+
+  for (let i = 0; i < Math.min(qfLosers.length, topN - 4); i++) {
+    results.push({ rank: 5 + i, team: qfLosers[i] });
+  }
+
+  return results;
+}
+
 export function buildTournamentSnapshot(
   settings: Settings,
   matches: Match[],
@@ -95,6 +203,8 @@ export function buildTournamentSnapshot(
 ): TournamentSnapshot {
   const bracketSize = getBracketSizeFromMatches(matches);
   const totalRounds = getTotalRounds(bracketSize);
+  const tournamentState = deriveTournamentState(settings);
+  const currentRoundOrder = deriveCurrentRoundOrder(matches);
   const roundProgress = getRoundProgress(settings, matches);
   const isRoundComplete_ = isRoundComplete(settings, matches);
   const canProceed = canProceedToNextRound(settings, matches);
@@ -103,8 +213,8 @@ export function buildTournamentSnapshot(
   const champion = findChampion(matches, teams);
 
   return {
-    tournamentState: settings.tournament_state || "draft",
-    currentRoundOrder: settings.current_round_order || 0,
+    tournamentState,
+    currentRoundOrder,
     currentRoundName: getCurrentRoundName(settings, matches),
     currentMatch,
     roundProgress,
@@ -210,44 +320,39 @@ export function reconstructBracketFromDB(
 
 // ── Write Operations ──────────────────────────────────────
 
+type SupabaseClient = {
+  from: (table: string) => {
+    update: (data: Record<string, unknown>) => {
+      eq: (col: string, val: unknown) => Promise<{ error: unknown }>;
+    };
+    select: () => {
+      eq: (col: string, val: unknown) => {
+        single: () => Promise<{ data: Match | null; error: unknown }>;
+      };
+    };
+  };
+};
+
 export async function startTournament(
-  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  supabase: SupabaseClient,
   settingsId: string
 ): Promise<Error | null> {
   const { error } = await supabase
     .from("settings")
     .update({
-      tournament_state: "running",
       tournament_status: "ongoing",
-      current_round_order: 0,
-    })
-    .eq("id", settingsId);
-  return error ? new Error(String(error)) : null;
-}
-
-export async function proceedToNextRound(
-  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
-  settingsId: string,
-  currentRoundOrder: number
-): Promise<Error | null> {
-  const { error } = await supabase
-    .from("settings")
-    .update({
-      current_round_order: currentRoundOrder + 1,
-      current_match_id: null,
     })
     .eq("id", settingsId);
   return error ? new Error(String(error)) : null;
 }
 
 export async function finishTournament(
-  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  supabase: SupabaseClient,
   settingsId: string
 ): Promise<Error | null> {
   const { error } = await supabase
     .from("settings")
     .update({
-      tournament_state: "completed",
       tournament_status: "completed",
     })
     .eq("id", settingsId);
@@ -255,7 +360,7 @@ export async function finishTournament(
 }
 
 export async function setCurrentMatchId(
-  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  supabase: SupabaseClient,
   settingsId: string,
   matchId: string | null
 ): Promise<Error | null> {
@@ -267,12 +372,7 @@ export async function setCurrentMatchId(
 }
 
 export async function saveMatchResult(
-  supabase: {
-    from: (table: string) => {
-      update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> };
-      select: () => { eq: (col: string, val: unknown) => { single: () => Promise<{ data: Match | null; error: unknown }> } };
-    }
-  },
+  supabase: SupabaseClient,
   matchId: string,
   scoreA: number,
   scoreB: number,
@@ -321,11 +421,7 @@ export async function saveMatchResult(
 }
 
 export async function resetMatchResult(
-  supabase: {
-    from: (table: string) => {
-      update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> };
-    }
-  },
+  supabase: SupabaseClient,
   matchId: string,
   matches: Match[]
 ): Promise<Error | null> {
@@ -370,12 +466,7 @@ export async function resetMatchResult(
 }
 
 export async function resetAllMatches(
-  supabase: {
-    from: (table: string) => {
-      update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> };
-      select: () => { eq?: (col: string, val: unknown) => Promise<{ data: unknown; error: unknown }> };
-    }
-  },
+  supabase: SupabaseClient,
   settingsId: string,
   matches: Match[]
 ): Promise<Error | null> {
@@ -405,30 +496,11 @@ export async function resetAllMatches(
   const { error: settingsErr } = await supabase
     .from("settings")
     .update({
-      current_round_order: 0,
+      tournament_status: "upcoming",
       current_match_id: null,
     })
     .eq("id", settingsId);
   if (settingsErr) return new Error(String(settingsErr));
 
   return null;
-}
-
-// ── Helpers ───────────────────────────────────────────────
-
-function getBracketSizeFromMatches(matches: Match[]): number {
-  const round0Count = matches.filter((m) => m.round_order === 0).length;
-  if (round0Count === 0) return 2;
-  return round0Count * 2;
-}
-
-function emptyBracket(): EngineBracket {
-  return {
-    teams: [],
-    rounds: [],
-    matches: [],
-    champion: null,
-    stats: { totalMatches: 0, completedMatches: 0, liveMatches: 0, waitingMatches: 0, progress: 0 },
-    config: { bracketSize: 0, totalByes: 0, bestOf: 3, seedingMode: "imported" },
-  };
 }
