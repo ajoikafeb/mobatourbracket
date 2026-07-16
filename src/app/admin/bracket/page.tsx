@@ -27,6 +27,8 @@ import {
   type EngineMatch,
   type EngineBracket,
   type EngineTeam,
+  type RoundName,
+  ROUND_ORDER,
 } from "@/engine";
 
 async function syncBracketsAfterSave(
@@ -67,15 +69,19 @@ async function syncBracketsAfterSave(
   const winnerTeam = match.teamA?.id === winnerId ? match.teamA : match.teamB;
 
   if (winnerTeam) {
-    await supabase
-      .from("brackets")
-      .update({
-        team_name: winnerTeam.name,
-        team_seed: winnerTeam.seed,
-        team_id: winnerTeam.id,
-      })
-      .eq("round_order", nextRoundOrder)
-      .eq("position", nextSlotPosition);
+    const nextRoundName = ROUND_ORDER[nextRoundOrder];
+    if (nextRoundName) {
+      await supabase.from("brackets").upsert(
+        {
+          round: nextRoundName,
+          position: nextSlotPosition,
+          team_name: winnerTeam.name,
+          team_seed: winnerTeam.seed,
+          team_id: winnerTeam.id,
+        },
+        { onConflict: "round,position" }
+      );
+    }
   }
 }
 
@@ -106,11 +112,19 @@ async function syncBracketsAfterReset(
   const nextRoundOrder = currentRoundOrder + 1;
   const nextSlotPosition = Math.floor(matchIndex / 2) * 2 + (matchIndex % 2 === 0 ? 0 : 1);
 
-  await supabase
-    .from("brackets")
-    .update({ team_name: "", team_seed: 0, team_id: null })
-    .eq("round_order", nextRoundOrder)
-    .eq("position", nextSlotPosition);
+  const nextRoundName = ROUND_ORDER[nextRoundOrder];
+  if (nextRoundName) {
+    await supabase.from("brackets").upsert(
+      {
+        round: nextRoundName,
+        position: nextSlotPosition,
+        team_name: "",
+        team_seed: 0,
+        team_id: null,
+      },
+      { onConflict: "round,position" }
+    );
+  }
 }
 
 export default function AdminBracketPage() {
@@ -199,20 +213,31 @@ export default function AdminBracketPage() {
       setSaving(true);
       try {
         const match = engineBracket?.matches.find((m) => m.id === matchId);
-        if (!match) return;
+        if (!match) {
+          setMessage("Error: Match not found.");
+          setTimeout(() => setMessage(""), 3000);
+          setSaving(false);
+          return;
+        }
 
         if (scoreA > scoreB) winnerId = match.teamA?.id || null;
         else if (scoreB > scoreA) winnerId = match.teamB?.id || null;
 
+        let result: ReturnType<typeof advanceWinner> = null;
         if (winnerId) {
-          advanceWinner(matchId, winnerId, engineBracket!.matches);
+          result = advanceWinner(matchId, winnerId, engineBracket!.matches);
         } else {
           match.scoreA = scoreA;
           match.scoreB = scoreB;
           match.status = status;
         }
 
-        for (const m of engineBracket!.matches) {
+        const matchesToSave = [match];
+        if (result?.updatedNextMatch) {
+          matchesToSave.push(result.updatedNextMatch);
+        }
+
+        for (const m of matchesToSave) {
           const dbRow = mapMatchToDB(m);
           const { error } = await supabase
             .from("matches")
@@ -227,7 +252,8 @@ export default function AdminBracketPage() {
 
         setMessage("Match saved successfully!");
         setTimeout(() => setMessage(""), 2000);
-      } catch {
+      } catch (err) {
+        console.error("Error saving match:", err);
         setMessage("Error saving match.");
         setTimeout(() => setMessage(""), 3000);
       } finally {
@@ -242,24 +268,41 @@ export default function AdminBracketPage() {
       if (!engineBracket) return;
       setSaving(true);
       try {
-        engineResetMatch(matchId, engineBracket.matches);
-
-        for (const m of engineBracket.matches) {
-          if (m.roundOrder === 0) continue;
-          const dbRow = mapMatchToDB(m);
-          await supabase.from("matches").update(dbRow).eq("id", m.id);
+        const match = engineBracket.matches.find((m) => m.id === matchId);
+        if (!match) {
+          setMessage("Error: Match not found.");
+          setTimeout(() => setMessage(""), 3000);
+          setSaving(false);
+          return;
         }
 
-        await syncBracketsAfterReset(
-          engineBracket.matches.find((m) => m.id === matchId)!,
-          supabase
-        );
+        engineResetMatch(matchId, engineBracket.matches);
+
+        const matchesToSave = [match];
+        if (match.nextMatchId) {
+          const nextMatch = engineBracket.matches.find(
+            (m) => m.id === match.nextMatchId
+          );
+          if (nextMatch) matchesToSave.push(nextMatch);
+        }
+
+        for (const m of matchesToSave) {
+          const dbRow = mapMatchToDB(m);
+          const { error } = await supabase
+            .from("matches")
+            .update(dbRow)
+            .eq("id", m.id);
+          if (error) throw error;
+        }
+
+        await syncBracketsAfterReset(match, supabase);
 
         await Promise.all([refetchMatches(), refetchBrackets()]);
 
         setMessage("Match reset successfully!");
         setTimeout(() => setMessage(""), 2000);
-      } catch {
+      } catch (err) {
+        console.error("Error resetting match:", err);
         setMessage("Error resetting match.");
         setTimeout(() => setMessage(""), 3000);
       } finally {
