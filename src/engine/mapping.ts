@@ -93,16 +93,15 @@ export function mapBracketToDB(
   slot: EngineBracketSlot
 ): Record<string, unknown> {
   return {
-    id: slot.id,
     round: slot.round,
     round_order: slot.roundOrder,
     position: slot.position,
     team_name: slot.teamName,
     team_seed: slot.teamSeed,
-    team_id: slot.teamId,
+    team_id: slot.teamId || null,
     is_bye: slot.isBye,
-    is_winner: false,
+    is_winner: slot.isWinner || false,
     is_current: false,
-    match_id: slot.matchId,
+    match_id: null,
   };
 }

@@ -254,16 +254,10 @@ export default function TournamentGeneratorPage() {
 
       const bracketRows = bracket.slots.map((s) => mapBracketToDB(s));
       if (bracketRows.length > 0) {
-        const bracketIds = bracketRows.map((r) => r.id as string);
-        const mappedBracketIds = bracketIds.map(
-          (bid) => idMap.get(bid) || bid
-        );
-        const finalBracketRows = bracketRows.map((r, i) => ({
+        const finalBracketRows = bracketRows.map((r) => ({
           ...r,
-          id: mappedBracketIds[i],
-          team_id: r.team_id ? idMap.get(r.team_id as string) || r.team_id : null,
-          match_id: r.match_id
-            ? idMap.get(r.match_id as string) || r.match_id
+          team_id: r.team_id
+            ? idMap.get(r.team_id as string) || r.team_id
             : null,
         }));
         const { error: bErr } = await supabase
@@ -276,7 +270,6 @@ export default function TournamentGeneratorPage() {
         const mapped = mapMatchToDB(m);
         return {
           ...mapped,
-          id: idMap.get(mapped.id as string) || mapped.id,
           team_a_id: mapped.team_a_id
             ? idMap.get(mapped.team_a_id as string) || mapped.team_a_id
             : null,
@@ -750,12 +743,31 @@ export default function TournamentGeneratorPage() {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <span className="text-xs text-zinc-400">Bracket Size</span>
-                  <span className="text-sm font-bold text-white">
-                    {determineBracketSize(teams.length)} teams
-                  </span>
-                </div>
+                {(() => {
+                  const bs = determineBracketSize(teams.length);
+                  const byes = bs - teams.length;
+                  return (
+                    <>
+                      <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                        <span className="text-xs text-zinc-400">Bracket Size (auto)</span>
+                        <span className="text-sm font-bold text-white">
+                          {bs} slots
+                          {byes > 0 && (
+                            <span className="ml-1.5 text-xs font-normal text-zinc-500">
+                              ({teams.length} teams + {byes} BYE{byes > 1 ? "s" : ""})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                        <span className="text-xs text-zinc-400">Rounds</span>
+                        <span className="text-sm font-bold text-white">
+                          {Math.log2(bs)} rounds
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <p className="text-xs text-zinc-500">This will:</p>
@@ -763,8 +775,11 @@ export default function TournamentGeneratorPage() {
                 <li>Delete all existing teams, brackets, and matches</li>
                 <li>Save {teams.length} teams with their players</li>
                 <li>
-                  Generate a {determineBracketSize(teams.length)}-team single
+                  Generate a {determineBracketSize(teams.length)}-slot single
                   elimination bracket
+                  {determineBracketSize(teams.length) - teams.length > 0 && (
+                    <> ({determineBracketSize(teams.length) - teams.length} BYE{determineBracketSize(teams.length) - teams.length > 1 ? "s" : ""})</>
+                  )}
                 </li>
               </ul>
 
