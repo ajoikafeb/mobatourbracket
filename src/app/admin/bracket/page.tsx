@@ -193,10 +193,7 @@ export default function AdminBracketPage() {
 
   useEffect(() => {
     if (loading || engineTeams.length === 0) return;
-    if (dbBrackets.length === 0) {
-      setEngineBracket(null);
-      return;
-    }
+    if (engineMatches.length === 0) return;
 
     const bestOf = settings?.best_of || 3;
 
@@ -238,7 +235,7 @@ export default function AdminBracketPage() {
 
     setEngineBracket(bracket);
     engineBracketRef.current = bracket;
-  }, [loading, engineTeams, engineMatches, dbBrackets, settings]);
+  }, [loading, engineTeams, engineMatches, settings]);
 
   const handleMatchClick = useCallback((match: EngineMatch) => {
     setSelectedMatch(match);
@@ -290,9 +287,9 @@ export default function AdminBracketPage() {
         }
 
         const syncError = await syncBracketsAfterSave(match, winnerId, supabase);
-        if (syncError) throw syncError;
+        if (syncError) console.error("Bracket sync warning:", syncError);
 
-        await Promise.all([refetchMatches(), refetchBrackets()]);
+        await refetchMatches();
 
         setMessage("Match saved successfully!");
         setTimeout(() => setMessage(""), 2000);
@@ -304,7 +301,7 @@ export default function AdminBracketPage() {
         setSaving(false);
       }
     },
-    [supabase, refetchMatches, refetchBrackets]
+    [supabase, refetchMatches]
   );
 
   const handleMatchReset = useCallback(
@@ -341,9 +338,9 @@ export default function AdminBracketPage() {
         }
 
         const syncError = await syncBracketsAfterReset(match, supabase);
-        if (syncError) throw syncError;
+        if (syncError) console.error("Bracket sync warning:", syncError);
 
-        await Promise.all([refetchMatches(), refetchBrackets()]);
+        await refetchMatches();
 
         setMessage("Match reset successfully!");
         setTimeout(() => setMessage(""), 2000);
@@ -355,7 +352,7 @@ export default function AdminBracketPage() {
         setSaving(false);
       }
     },
-    [supabase, refetchMatches, refetchBrackets]
+    [supabase, refetchMatches]
   );
 
   const handleUndo = useCallback(() => {}, []);
