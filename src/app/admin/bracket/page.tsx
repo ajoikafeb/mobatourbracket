@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Swords, Loader2, Wand2 } from "lucide-react";
 import Link from "next/link";
@@ -35,33 +35,45 @@ async function syncBracketsAfterSave(
   match: EngineMatch,
   winnerId: string | null,
   supabase: ReturnType<typeof createClient>
-) {
-  if (!winnerId) return;
+): Promise<Error | null> {
+  if (!winnerId) return null;
 
   const currentRoundOrder = match.roundOrder;
   const matchIndex = match.matchIndex;
 
-  const { data: currentSlots } = await supabase
+  const { data: currentSlots, error: fetchError } = await supabase
     .from("brackets")
     .select("id, position, team_id")
     .eq("round_order", currentRoundOrder);
 
-  if (!currentSlots) return;
+  if (fetchError) {
+    console.error("syncBracketsAfterSave: fetch current slots error:", fetchError);
+    return fetchError;
+  }
+  if (!currentSlots) return null;
 
   const slotA = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2);
   const slotB = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2 + 1);
 
   if (slotA) {
-    await supabase
+    const { error } = await supabase
       .from("brackets")
       .update({ is_winner: slotA.team_id === winnerId })
       .eq("id", slotA.id);
+    if (error) {
+      console.error("syncBracketsAfterSave: update slotA error:", error);
+      return error;
+    }
   }
   if (slotB) {
-    await supabase
+    const { error } = await supabase
       .from("brackets")
       .update({ is_winner: slotB.team_id === winnerId })
       .eq("id", slotB.id);
+    if (error) {
+      console.error("syncBracketsAfterSave: update slotB error:", error);
+      return error;
+    }
   }
 
   const nextRoundOrder = currentRoundOrder + 1;
@@ -71,9 +83,10 @@ async function syncBracketsAfterSave(
   if (winnerTeam) {
     const nextRoundName = ROUND_ORDER[nextRoundOrder];
     if (nextRoundName) {
-      await supabase.from("brackets").upsert(
+      const { error } = await supabase.from("brackets").upsert(
         {
           round: nextRoundName,
+          round_order: nextRoundOrder,
           position: nextSlotPosition,
           team_name: winnerTeam.name,
           team_seed: winnerTeam.seed,
@@ -81,32 +94,50 @@ async function syncBracketsAfterSave(
         },
         { onConflict: "round,position" }
       );
+      if (error) {
+        console.error("syncBracketsAfterSave: upsert next round slot error:", error);
+        return error;
+      }
     }
   }
+
+  return null;
 }
 
 async function syncBracketsAfterReset(
   match: EngineMatch,
   supabase: ReturnType<typeof createClient>
-) {
+): Promise<Error | null> {
   const currentRoundOrder = match.roundOrder;
   const matchIndex = match.matchIndex;
 
-  const { data: currentSlots } = await supabase
+  const { data: currentSlots, error: fetchError } = await supabase
     .from("brackets")
     .select("id, position")
     .eq("round_order", currentRoundOrder);
 
-  if (!currentSlots) return;
+  if (fetchError) {
+    console.error("syncBracketsAfterReset: fetch current slots error:", fetchError);
+    return fetchError;
+  }
+  if (!currentSlots) return null;
 
   const slotA = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2);
   const slotB = currentSlots.find((b: { position: number }) => b.position === matchIndex * 2 + 1);
 
   if (slotA) {
-    await supabase.from("brackets").update({ is_winner: false }).eq("id", slotA.id);
+    const { error } = await supabase.from("brackets").update({ is_winner: false }).eq("id", slotA.id);
+    if (error) {
+      console.error("syncBracketsAfterReset: update slotA error:", error);
+      return error;
+    }
   }
   if (slotB) {
-    await supabase.from("brackets").update({ is_winner: false }).eq("id", slotB.id);
+    const { error } = await supabase.from("brackets").update({ is_winner: false }).eq("id", slotB.id);
+    if (error) {
+      console.error("syncBracketsAfterReset: update slotB error:", error);
+      return error;
+    }
   }
 
   const nextRoundOrder = currentRoundOrder + 1;
@@ -114,9 +145,10 @@ async function syncBracketsAfterReset(
 
   const nextRoundName = ROUND_ORDER[nextRoundOrder];
   if (nextRoundName) {
-    await supabase.from("brackets").upsert(
+    const { error } = await supabase.from("brackets").upsert(
       {
         round: nextRoundName,
+        round_order: nextRoundOrder,
         position: nextSlotPosition,
         team_name: "",
         team_seed: 0,
@@ -124,7 +156,13 @@ async function syncBracketsAfterReset(
       },
       { onConflict: "round,position" }
     );
+    if (error) {
+      console.error("syncBracketsAfterReset: upsert next round slot error:", error);
+      return error;
+    }
   }
+
+  return null;
 }
 
 export default function AdminBracketPage() {
@@ -138,6 +176,7 @@ export default function AdminBracketPage() {
   const [hoveredTeamId, setHoveredTeamId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const engineBracketRef = useRef<EngineBracket | null>(null);
 
   const supabase = createClient();
   const loading = bracketsLoading || teamsLoading || matchesLoading;
@@ -196,6 +235,7 @@ export default function AdminBracketPage() {
     bracket.stats = computeStats(bracket.matches);
 
     setEngineBracket(bracket);
+    engineBracketRef.current = bracket;
   }, [loading, engineTeams, engineMatches, dbBrackets, settings]);
 
   const handleMatchClick = useCallback((match: EngineMatch) => {
@@ -210,9 +250,10 @@ export default function AdminBracketPage() {
       winnerId: string | null,
       status: EngineMatch["status"]
     ) => {
+      const bracket = engineBracketRef.current;
       setSaving(true);
       try {
-        const match = engineBracket?.matches.find((m) => m.id === matchId);
+        const match = bracket?.matches.find((m) => m.id === matchId);
         if (!match) {
           setMessage("Error: Match not found.");
           setTimeout(() => setMessage(""), 3000);
@@ -225,7 +266,7 @@ export default function AdminBracketPage() {
 
         let result: ReturnType<typeof advanceWinner> = null;
         if (winnerId) {
-          result = advanceWinner(matchId, winnerId, engineBracket!.matches);
+          result = advanceWinner(matchId, winnerId, bracket!.matches);
         } else {
           match.scoreA = scoreA;
           match.scoreB = scoreB;
@@ -246,7 +287,8 @@ export default function AdminBracketPage() {
           if (error) throw error;
         }
 
-        await syncBracketsAfterSave(match, winnerId, supabase);
+        const syncError = await syncBracketsAfterSave(match, winnerId, supabase);
+        if (syncError) throw syncError;
 
         await Promise.all([refetchMatches(), refetchBrackets()]);
 
@@ -260,15 +302,16 @@ export default function AdminBracketPage() {
         setSaving(false);
       }
     },
-    [engineBracket, supabase, refetchMatches, refetchBrackets]
+    [supabase, refetchMatches, refetchBrackets]
   );
 
   const handleMatchReset = useCallback(
     async (matchId: string) => {
-      if (!engineBracket) return;
+      const bracket = engineBracketRef.current;
+      if (!bracket) return;
       setSaving(true);
       try {
-        const match = engineBracket.matches.find((m) => m.id === matchId);
+        const match = bracket.matches.find((m) => m.id === matchId);
         if (!match) {
           setMessage("Error: Match not found.");
           setTimeout(() => setMessage(""), 3000);
@@ -276,11 +319,11 @@ export default function AdminBracketPage() {
           return;
         }
 
-        engineResetMatch(matchId, engineBracket.matches);
+        engineResetMatch(matchId, bracket.matches);
 
         const matchesToSave = [match];
         if (match.nextMatchId) {
-          const nextMatch = engineBracket.matches.find(
+          const nextMatch = bracket.matches.find(
             (m) => m.id === match.nextMatchId
           );
           if (nextMatch) matchesToSave.push(nextMatch);
@@ -295,7 +338,8 @@ export default function AdminBracketPage() {
           if (error) throw error;
         }
 
-        await syncBracketsAfterReset(match, supabase);
+        const syncError = await syncBracketsAfterReset(match, supabase);
+        if (syncError) throw syncError;
 
         await Promise.all([refetchMatches(), refetchBrackets()]);
 
@@ -309,55 +353,70 @@ export default function AdminBracketPage() {
         setSaving(false);
       }
     },
-    [engineBracket, supabase, refetchMatches, refetchBrackets]
+    [supabase, refetchMatches, refetchBrackets]
   );
 
   const handleUndo = useCallback(() => {}, []);
   const handleRedo = useCallback(() => {}, []);
 
   const handleResetAll = useCallback(async () => {
-    if (!engineBracket) return;
+    const bracket = engineBracketRef.current;
+    if (!bracket) return;
     if (!confirm("Reset all match results? This cannot be undone.")) return;
 
     setSaving(true);
     try {
-      for (const m of engineBracket.matches) {
-        m.winnerId = null;
-        m.loserId = null;
-        m.scoreA = 0;
-        m.scoreB = 0;
-        m.status = m.roundOrder === 0 ? "waiting" : "waiting";
+      for (const m of bracket.matches) {
+        const updatedMatch = { ...m };
+        updatedMatch.winnerId = null;
+        updatedMatch.loserId = null;
+        updatedMatch.scoreA = 0;
+        updatedMatch.scoreB = 0;
+        updatedMatch.status = "waiting" as const;
 
-        if (m.roundOrder > 0) {
-          m.teamA = null;
-          m.teamB = null;
+        if (updatedMatch.roundOrder > 0) {
+          updatedMatch.teamA = null;
+          updatedMatch.teamB = null;
         }
 
-        const dbRow = mapMatchToDB(m);
-        await supabase.from("matches").update(dbRow).eq("id", m.id);
+        const dbRow = mapMatchToDB(updatedMatch);
+        const { error } = await supabase.from("matches").update(dbRow).eq("id", m.id);
+        if (error) {
+          console.error("Error resetting match in DB:", error);
+          throw error;
+        }
       }
 
-      await supabase
+      const { error: clearWinnerError } = await supabase
         .from("brackets")
         .update({ is_winner: false })
         .eq("is_winner", true);
+      if (clearWinnerError) {
+        console.error("Error clearing winner flags:", clearWinnerError);
+        throw clearWinnerError;
+      }
 
-      await supabase
+      const { error: clearNextRoundError } = await supabase
         .from("brackets")
         .update({ team_name: "", team_seed: 0, team_id: null })
         .gt("round_order", 0);
+      if (clearNextRoundError) {
+        console.error("Error clearing next round slots:", clearNextRoundError);
+        throw clearNextRoundError;
+      }
 
       await Promise.all([refetchMatches(), refetchBrackets()]);
 
       setMessage("All matches reset!");
       setTimeout(() => setMessage(""), 2000);
-    } catch {
+    } catch (err) {
+      console.error("Error resetting bracket:", err);
       setMessage("Error resetting bracket.");
       setTimeout(() => setMessage(""), 3000);
     } finally {
       setSaving(false);
     }
-  }, [engineBracket, supabase, refetchMatches, refetchBrackets]);
+  }, [supabase, refetchMatches, refetchBrackets]);
 
   const handleRegenerate = useCallback(() => {
     window.location.href = "/admin/tournament-generator";
