@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Calendar,
@@ -31,12 +31,14 @@ export default function AdminSchedulePage() {
   const [message, setMessage] = useState("");
   const supabase = createClient();
 
-  if (loading) return <LoadingSkeleton />;
+  useEffect(() => {
+    if (!loading && !initialized) {
+      setEditMatches([...matches]);
+      setInitialized(true);
+    }
+  }, [loading, initialized, matches]);
 
-  if (!initialized) {
-    setEditMatches([...matches]);
-    setInitialized(true);
-  }
+  if (loading) return <LoadingSkeleton />;
 
   function addMatch() {
     const newMatch: EditableMatch = {

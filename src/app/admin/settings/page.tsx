@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Settings, Save, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -14,20 +14,24 @@ import { cn } from "@/lib/utils";
 
 export default function AdminSettingsPage() {
   const { settings, loading } = useSettings();
-  const defaults = useMemo(() => ({
-    tournamentName: settings?.tournament_name || "",
-    tournamentSubtitle: settings?.tournament_subtitle || "",
-    tournamentStatus: settings?.tournament_status || "upcoming",
-    footerText: settings?.footer_text || "",
-  }), [settings]);
-
-  const [tournamentName, setTournamentName] = useState(defaults.tournamentName);
-  const [tournamentSubtitle, setTournamentSubtitle] = useState(defaults.tournamentSubtitle);
-  const [tournamentStatus, setTournamentStatus] = useState<string>(defaults.tournamentStatus);
-  const [footerText, setFooterText] = useState(defaults.footerText);
+  const [tournamentName, setTournamentName] = useState("");
+  const [tournamentSubtitle, setTournamentSubtitle] = useState("");
+  const [tournamentStatus, setTournamentStatus] = useState("upcoming");
+  const [footerText, setFooterText] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [initialized, setInitialized] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    if (settings && !initialized) {
+      setTournamentName(settings.tournament_name || "");
+      setTournamentSubtitle(settings.tournament_subtitle || "");
+      setTournamentStatus(settings.tournament_status || "upcoming");
+      setFooterText(settings.footer_text || "");
+      setInitialized(true);
+    }
+  }, [settings, initialized]);
 
   if (loading) return <LoadingSkeleton />;
 

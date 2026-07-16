@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Swords, Save, Loader2, Trophy, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -34,37 +34,38 @@ export default function AdminBracketPage() {
 
   const loading = bracketsLoading || teamsLoading;
 
+  useEffect(() => {
+    if (loading || initialized) return;
+
+    if (brackets.length === 0) {
+      const initialBrackets: Bracket[] = [];
+      let position = 0;
+      ROUNDS.forEach((round) => {
+        for (let i = 0; i < round.count; i++) {
+          initialBrackets.push({
+            id: `new-${round.value}-${i}`,
+            round: round.value,
+            position: position++,
+            team_name: "",
+            team_seed: position,
+            team_id: null,
+            opponent_id: null,
+            match_id: null,
+            is_winner: false,
+            is_current: false,
+            created_at: "",
+            updated_at: "",
+          });
+        }
+      });
+      setEditBrackets(initialBrackets);
+    } else {
+      setEditBrackets([...brackets]);
+    }
+    setInitialized(true);
+  }, [loading, initialized, brackets]);
+
   if (loading) return <LoadingSkeleton />;
-
-  if (!initialized && brackets.length === 0 && editBrackets.length === 0) {
-    const initialBrackets: Bracket[] = [];
-    let position = 0;
-    ROUNDS.forEach((round) => {
-      for (let i = 0; i < round.count; i++) {
-        initialBrackets.push({
-          id: `new-${round.value}-${i}`,
-          round: round.value,
-          position: position++,
-          team_name: "",
-          team_seed: position,
-          team_id: null,
-          opponent_id: null,
-          match_id: null,
-          is_winner: false,
-          is_current: false,
-          created_at: "",
-          updated_at: "",
-        });
-      }
-    });
-    setEditBrackets(initialBrackets);
-    setInitialized(true);
-  }
-
-  if (!initialized && brackets.length > 0) {
-    setEditBrackets([...brackets]);
-    setInitialized(true);
-  }
 
   function updateBracket(
     id: string,

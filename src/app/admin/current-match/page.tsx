@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Radio, Save, Loader2, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMatches } from "@/hooks/use-matches";
 import { cn } from "@/lib/utils";
+
 export default function AdminCurrentMatchPage() {
   const { matches, refetch } = useMatches();
   const [selectedId, setSelectedId] = useState("");
@@ -27,25 +28,24 @@ export default function AdminCurrentMatchPage() {
     ? matches.find((m) => m.id === selectedId)
     : liveMatch;
 
-  const defaultStatus = useMemo(() => {
-    if (displayMatch) {
-      return displayMatch.status as "waiting" | "live" | "finished";
+  useEffect(() => {
+    if (displayMatch && !selectedId) {
+      setSelectedId(displayMatch.id);
+      setStatus(displayMatch.status as "waiting" | "live" | "finished");
+      setScoreA(displayMatch.score_a);
+      setScoreB(displayMatch.score_b);
+      setWinner(displayMatch.winner || "");
     }
-    return "waiting" as const;
-  }, [displayMatch]);
+  }, [displayMatch, selectedId]);
 
-  const defaultScoreA = useMemo(() => displayMatch?.score_a ?? 0, [displayMatch]);
-  const defaultScoreB = useMemo(() => displayMatch?.score_b ?? 0, [displayMatch]);
-  const defaultWinner = useMemo(() => displayMatch?.winner || "", [displayMatch]);
-  const defaultSelectedId = useMemo(() => displayMatch?.id || "", [displayMatch]);
-
-  if (!selectedId && defaultSelectedId) {
-    setSelectedId(defaultSelectedId);
-    setStatus(defaultStatus);
-    setScoreA(defaultScoreA);
-    setScoreB(defaultScoreB);
-    setWinner(defaultWinner);
-  }
+  useEffect(() => {
+    if (selectedId && displayMatch) {
+      setStatus(displayMatch.status as "waiting" | "live" | "finished");
+      setScoreA(displayMatch.score_a);
+      setScoreB(displayMatch.score_b);
+      setWinner(displayMatch.winner || "");
+    }
+  }, [selectedId, displayMatch]);
 
   async function handleSave() {
     if (!selectedId) return;
@@ -119,8 +119,7 @@ export default function AdminCurrentMatchPage() {
           <option value="">Select a match...</option>
           {matches.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.team_a} vs {m.team_b} — {m.round} (
-              {m.status})
+              {m.team_a} vs {m.team_b} — {m.round} ({m.status})
             </option>
           ))}
         </Select>

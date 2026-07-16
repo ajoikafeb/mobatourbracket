@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -35,10 +36,36 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    if (pathname === "/admin/login") {
+      setAuthChecked(true);
+      return;
+    }
+
+    async function checkAuth() {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        router.replace("/admin/login");
+        return;
+      }
+      setAuthChecked(true);
+    }
+    checkAuth();
+  }, [pathname, router, supabase]);
 
   if (pathname === "/admin/login") {
     return children;
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#09090B] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-400 animate-spin" />
+      </div>
+    );
   }
 
   async function handleLogout() {
