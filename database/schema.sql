@@ -1,8 +1,8 @@
 -- ============================================
 -- Neosoul Tournament Tracker — Database Schema
 -- ============================================
--- Run this SQL in your Supabase SQL Editor
--- to create the required tables.
+-- Run this SQL in your Supabase SQL Editor.
+-- Safe to run multiple times (idempotent).
 
 -- Teams table
 CREATE TABLE IF NOT EXISTS teams (
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS teams (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Settings table (tournament configuration)
+-- Settings table
 CREATE TABLE IF NOT EXISTS settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   tournament_name TEXT NOT NULL DEFAULT 'Neosoul Tournament',
@@ -74,19 +74,35 @@ CREATE INDEX IF NOT EXISTS idx_brackets_position ON brackets(position);
 CREATE INDEX IF NOT EXISTS idx_brackets_team_id ON brackets(team_id);
 CREATE INDEX IF NOT EXISTS idx_teams_team_name ON teams(team_name);
 
--- RLS Policies
+-- RLS
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE brackets ENABLE ROW LEVEL SECURITY;
 
--- Public read access
+-- Public read policies (drop first if they exist)
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Public can read teams" ON teams;
+  DROP POLICY IF EXISTS "Public can read settings" ON settings;
+  DROP POLICY IF EXISTS "Public can read matches" ON matches;
+  DROP POLICY IF EXISTS "Public can read brackets" ON brackets;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Public can read teams" ON teams FOR SELECT USING (true);
 CREATE POLICY "Public can read settings" ON settings FOR SELECT USING (true);
 CREATE POLICY "Public can read matches" ON matches FOR SELECT USING (true);
 CREATE POLICY "Public can read brackets" ON brackets FOR SELECT USING (true);
 
--- Authenticated full access (admin)
+-- Admin full-access policies (drop first if they exist)
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Admin can manage teams" ON teams;
+  DROP POLICY IF EXISTS "Admin can manage settings" ON settings;
+  DROP POLICY IF EXISTS "Admin can manage matches" ON matches;
+  DROP POLICY IF EXISTS "Admin can manage brackets" ON brackets;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Admin can manage teams" ON teams FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Admin can manage settings" ON settings FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Admin can manage matches" ON matches FOR ALL USING (auth.role() = 'authenticated');
@@ -101,18 +117,23 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_teams_updated_at ON teams;
+DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
+DROP TRIGGER IF EXISTS update_matches_updated_at ON matches;
+DROP TRIGGER IF EXISTS update_brackets_updated_at ON brackets;
+
 CREATE TRIGGER update_teams_updated_at BEFORE UPDATE ON teams FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_matches_updated_at BEFORE UPDATE ON matches FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_brackets_updated_at BEFORE UPDATE ON brackets FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Enable Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE teams;
-ALTER PUBLICATION supabase_realtime ADD TABLE settings;
-ALTER PUBLICATION supabase_realtime ADD TABLE matches;
-ALTER PUBLICATION supabase_realtime ADD TABLE brackets;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE teams; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE settings; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE matches; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE brackets; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- Insert default settings
+-- Insert default settings (only if empty)
 INSERT INTO settings (tournament_name, tournament_subtitle, tournament_status, footer_text)
-VALUES ('Neosoul Tournament', 'Community Mobile MOBA Tournament', 'upcoming', 'Built for the community, by the community.')
-ON CONFLICT DO NOTHING;
+SELECT 'Neosoul Tournament', 'Community Mobile MOBA Tournament', 'upcoming', 'Built for the community, by the community.'
+WHERE NOT EXISTS (SELECT 1 FROM settings LIMIT 1);
