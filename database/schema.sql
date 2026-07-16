@@ -80,6 +80,17 @@ ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE brackets ENABLE ROW LEVEL SECURITY;
 
+-- Grants (required for Supabase anon/authenticated roles)
+GRANT SELECT ON teams TO anon;
+GRANT SELECT ON settings TO anon;
+GRANT SELECT ON matches TO anon;
+GRANT SELECT ON brackets TO anon;
+
+GRANT ALL ON teams TO authenticated;
+GRANT ALL ON settings TO authenticated;
+GRANT ALL ON matches TO authenticated;
+GRANT ALL ON brackets TO authenticated;
+
 -- Public read policies (drop first if they exist)
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Public can read teams" ON teams;

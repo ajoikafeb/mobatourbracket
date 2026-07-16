@@ -7,11 +7,58 @@ import type { Match } from "@/lib/types";
 export function useMatches(filter?: "waiting" | "live" | "finished") {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const supabase = createClient();
+
+    async function fetchMatches() {
+      try {
+        let query = supabase
+          .from("matches")
+          .select("*")
+          .order("match_date", { ascending: true });
+        if (filter) {
+          query = query.eq("status", filter);
+        }
+        const { data, error } = await query;
+        if (!cancelled) {
+          setMatches(error ? [] : data || []);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setMatches([]);
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchMatches();
+
+    try {
+      const channel = supabase
+        .channel("matches-changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "matches" },
+          () => fetchMatches()
+        )
+        .subscribe();
+      return () => {
+        cancelled = true;
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [filter]);
+
+  const refetch = async () => {
+    try {
+      const supabase = createClient();
       let query = supabase
         .from("matches")
         .select("*")
@@ -19,48 +66,11 @@ export function useMatches(filter?: "waiting" | "live" | "finished") {
       if (filter) {
         query = query.eq("status", filter);
       }
-      const { data } = await query;
-      if (!cancelled) {
-        setMatches(data || []);
-        setLoading(false);
-      }
-    })();
-
-    const channel = supabase
-      .channel("matches-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "matches" },
-        async () => {
-          let q = supabase
-            .from("matches")
-            .select("*")
-            .order("match_date", { ascending: true });
-          if (filter) {
-            q = q.eq("status", filter);
-          }
-          const { data } = await q;
-          setMatches(data || []);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [supabase, filter]);
-
-  const refetch = async () => {
-    let query = supabase
-      .from("matches")
-      .select("*")
-      .order("match_date", { ascending: true });
-    if (filter) {
-      query = query.eq("status", filter);
+      const { data, error } = await query;
+      setMatches(error ? [] : data || []);
+    } catch {
+      setMatches([]);
     }
-    const { data } = await query;
-    setMatches(data || []);
   };
 
   return { matches, loading, refetch };
@@ -69,45 +79,52 @@ export function useMatches(filter?: "waiting" | "live" | "finished") {
 export function useCurrentMatch() {
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("status", "live")
-        .limit(1)
-        .single();
-      if (!cancelled) {
-        setMatch(data);
-        setLoading(false);
-      }
-    })();
+    const supabase = createClient();
 
-    const channel = supabase
-      .channel("current-match-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "matches" },
-        async () => {
-          const { data } = await supabase
-            .from("matches")
-            .select("*")
-            .eq("status", "live")
-            .limit(1)
-            .single();
-          setMatch(data);
+    async function fetchCurrentMatch() {
+      try {
+        const { data, error } = await supabase
+          .from("matches")
+          .select("*")
+          .eq("status", "live")
+          .limit(1)
+          .single();
+        if (!cancelled) {
+          setMatch(error ? null : data);
+          setLoading(false);
         }
-      )
-      .subscribe();
+      } catch {
+        if (!cancelled) {
+          setMatch(null);
+          setLoading(false);
+        }
+      }
+    }
 
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
+    fetchCurrentMatch();
+
+    try {
+      const channel = supabase
+        .channel("current-match-changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "matches" },
+          () => fetchCurrentMatch()
+        )
+        .subscribe();
+      return () => {
+        cancelled = true;
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, []);
 
   return { match, loading };
 }
@@ -115,51 +132,55 @@ export function useCurrentMatch() {
 export function useNextMatch() {
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const now = new Date().toISOString();
-      const { data } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("status", "waiting")
-        .gte("match_date", now)
-        .order("match_date", { ascending: true })
-        .limit(1)
-        .single();
-      if (!cancelled) {
-        setMatch(data);
-        setLoading(false);
-      }
-    })();
+    const supabase = createClient();
 
-    const channel = supabase
-      .channel("next-match-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "matches" },
-        async () => {
-          const now = new Date().toISOString();
-          const { data } = await supabase
-            .from("matches")
-            .select("*")
-            .eq("status", "waiting")
-            .gte("match_date", now)
-            .order("match_date", { ascending: true })
-            .limit(1)
-            .single();
-          setMatch(data);
+    async function fetchNextMatch() {
+      try {
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+          .from("matches")
+          .select("*")
+          .eq("status", "waiting")
+          .gte("match_date", now)
+          .order("match_date", { ascending: true })
+          .limit(1)
+          .single();
+        if (!cancelled) {
+          setMatch(error ? null : data);
+          setLoading(false);
         }
-      )
-      .subscribe();
+      } catch {
+        if (!cancelled) {
+          setMatch(null);
+          setLoading(false);
+        }
+      }
+    }
 
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
+    fetchNextMatch();
+
+    try {
+      const channel = supabase
+        .channel("next-match-changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "matches" },
+          () => fetchNextMatch()
+        )
+        .subscribe();
+      return () => {
+        cancelled = true;
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, []);
 
   return { match, loading };
 }

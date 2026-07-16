@@ -7,48 +7,60 @@ import type { Bracket, BracketWithTeam, Team } from "@/lib/types";
 export function useBrackets() {
   const [brackets, setBrackets] = useState<Bracket[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const { data } = await supabase
+    const supabase = createClient();
+
+    async function fetchBrackets() {
+      try {
+        const { data, error } = await supabase
+          .from("brackets")
+          .select("*")
+          .order("position", { ascending: true });
+        if (!cancelled) {
+          setBrackets(error ? [] : data || []);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setBrackets([]);
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchBrackets();
+
+    try {
+      const channel = supabase
+        .channel("brackets-changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "brackets" },
+          () => fetchBrackets()
+        )
+        .subscribe();
+      return () => {
+        cancelled = true;
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      return () => { cancelled = true; };
+    }
+  }, []);
+
+  const refetch = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
         .from("brackets")
         .select("*")
         .order("position", { ascending: true });
-      if (!cancelled) {
-        setBrackets(data || []);
-        setLoading(false);
-      }
-    })();
-
-    const channel = supabase
-      .channel("brackets-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "brackets" },
-        async () => {
-          const { data } = await supabase
-            .from("brackets")
-            .select("*")
-            .order("position", { ascending: true });
-          setBrackets(data || []);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
-
-  const refetch = async () => {
-    const { data } = await supabase
-      .from("brackets")
-      .select("*")
-      .order("position", { ascending: true });
-    setBrackets(data || []);
+      setBrackets(error ? [] : data || []);
+    } catch {
+      setBrackets([]);
+    }
   };
 
   return { brackets, loading, refetch };
