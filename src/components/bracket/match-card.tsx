@@ -54,7 +54,7 @@ function TeamRow({
   matchStatus: EngineMatch["status"];
 }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [tooltipRect, setTooltipRect] = useState<DOMRect | null>(null);
   const isEmpty = !team;
   const isBye = team?.name === "BYE";
 
@@ -63,8 +63,7 @@ function TeamRow({
       className="relative"
       onMouseEnter={(e) => {
         if (!team || isBye) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+        setTooltipRect(e.currentTarget.getBoundingClientRect());
         setShowTooltip(true);
         onHover?.(team.id);
       }}
@@ -141,8 +140,8 @@ function TeamRow({
         </span>
       </div>
 
-      {showTooltip && team && !isBye && createPortal(
-        <TeamTooltip team={team} position={tooltipPos} />,
+      {showTooltip && team && !isBye && tooltipRect && createPortal(
+        <TeamTooltip team={team} rect={tooltipRect} />,
         document.body
       )}
     </div>
