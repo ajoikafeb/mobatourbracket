@@ -9,9 +9,7 @@ import { AnimatedBackground } from "@/components/shared/animated-background";
 import { PageWrapper } from "@/components/shared/page-wrapper";
 import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
-import { useTeams } from "@/hooks/use-teams";
-import { useMatches } from "@/hooks/use-matches";
-import { useSettings } from "@/hooks/use-settings";
+import { useTournament } from "@/hooks/use-tournament";
 import { cn } from "@/lib/utils";
 import type { BracketWithTeam, Team } from "@/lib/types";
 import { ROUND_ORDER, ROUND_CONFIG } from "@/lib/types";
@@ -482,9 +480,7 @@ function TeamDetailSheet({
 }
 
 export default function BracketPage() {
-  const { teams, loading: teamsLoading } = useTeams();
-  const { matches, loading: matchesLoading } = useMatches();
-  const { settings } = useSettings();
+  const { teams, matches, settings, loading } = useTournament();
 
   const brackets = useMemo(() => {
     if (teams.length === 0 || matches.length === 0) return [];
@@ -539,7 +535,6 @@ export default function BracketPage() {
     return result;
   }, [teams, matches]);
 
-  const loading = teamsLoading || matchesLoading;
   const [hoveredBracket, setHoveredBracket] = useState<BracketWithTeam | null>(null);
   const [selectedBracket, setSelectedBracket] = useState<BracketWithTeam | null>(null);
 

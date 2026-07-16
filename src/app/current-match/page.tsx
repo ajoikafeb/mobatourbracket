@@ -22,9 +22,7 @@ import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useCurrentMatch, useNextMatch, useMatches } from "@/hooks/use-matches";
-import { useTeams } from "@/hooks/use-teams";
-import { useSettings } from "@/hooks/use-settings";
+import { useTournament } from "@/hooks/use-tournament";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 import type { Match, Team } from "@/lib/types";
 
@@ -396,7 +394,7 @@ function RecentResults({ matches }: { matches: Match[] }) {
   );
 }
 
-function NextMatchPreview({ match }: { match: NonNullable<ReturnType<typeof useNextMatch>["match"]> }) {
+function NextMatchPreview({ match }: { match: Match }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -443,15 +441,17 @@ function NextMatchPreview({ match }: { match: NonNullable<ReturnType<typeof useN
 }
 
 export default function CurrentMatchPage() {
-  const { match, loading: matchLoading } = useCurrentMatch();
-  const { match: nextMatch, loading: nextLoading } = useNextMatch();
-  const { matches: recentMatches, loading: recentLoading } = useMatches("finished");
-  const { teams } = useTeams();
-  const { settings } = useSettings();
+  const { matches, teams, settings, currentMatch: match, loading, champion } = useTournament();
 
   const [showDetails, setShowDetails] = useState(false);
 
-  const recentFinished = recentMatches.slice(-5).reverse();
+  const recentFinished = matches.filter((m) => m.status === "finished").slice(-5).reverse();
+
+  const nextMatch = !match
+    ? matches
+        .filter((m) => m.status === "waiting" && m.team_a_id && m.team_b_id)
+        .sort((a, b) => a.round_order - b.round_order || a.match_index - b.match_index)[0] || null
+    : null;
 
   const teamAData = teams.find(
     (t) => t.team_name === match?.team_a || t.id === match?.team_a_id
@@ -484,7 +484,7 @@ export default function CurrentMatchPage() {
               </div>
             </div>
 
-            {matchLoading ? (
+            {loading ? (
               <LoadingSkeleton />
             ) : !match ? (
               <div className="space-y-8">
@@ -494,11 +494,11 @@ export default function CurrentMatchPage() {
                   description="Matches will appear here when they go live."
                 />
 
-                {!nextLoading && nextMatch && (
+                {nextMatch && (
                   <NextMatchPreview match={nextMatch} />
                 )}
 
-                {!recentLoading && recentFinished.length > 0 && (
+                {recentFinished.length > 0 && (
                   <RecentResults matches={recentFinished} />
                 )}
               </div>
@@ -581,7 +581,7 @@ export default function CurrentMatchPage() {
 
                 {match.winner && <WinnerAnnouncement winner={match.winner} />}
 
-                {!recentLoading && recentFinished.length > 0 && (
+                {recentFinished.length > 0 && (
                   <RecentResults matches={recentFinished} />
                 )}
               </div>

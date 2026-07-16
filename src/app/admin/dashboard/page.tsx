@@ -12,16 +12,26 @@ import {
   Zap,
   ArrowRight,
   Users,
-  Sparkles,
   Settings,
   Wand2,
+  Play,
+  ChevronRight,
+  RotateCcw,
+  Flag,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useMatches, useCurrentMatch } from "@/hooks/use-matches";
-import { useBrackets } from "@/hooks/use-brackets";
-import { useTeams } from "@/hooks/use-teams";
-import { useSettings } from "@/hooks/use-settings";
+import { useTournament } from "@/hooks/use-tournament";
+import { cn } from "@/lib/utils";
+import type { Match, TournamentState } from "@/lib/types";
+
+const STATE_LABELS: Record<TournamentState, { label: string; color: string; bg: string }> = {
+  draft: { label: "Draft", color: "text-zinc-400", bg: "bg-zinc-500/20 border-zinc-500/30" },
+  ready: { label: "Ready", color: "text-blue-400", bg: "bg-blue-500/20 border-blue-500/30" },
+  running: { label: "Running", color: "text-green-400", bg: "bg-green-500/20 border-green-500/30" },
+  completed: { label: "Completed", color: "text-purple-400", bg: "bg-purple-500/20 border-purple-500/30" },
+};
 
 const quickActions = [
   {
@@ -46,17 +56,17 @@ const quickActions = [
     highlight: false,
   },
   {
-    href: "/admin/schedule",
-    label: "Edit Schedule",
-    icon: Clock,
-    color: "bg-green-500/20 text-green-400",
-    highlight: false,
-  },
-  {
     href: "/admin/current-match",
     label: "Current Match",
     icon: Radio,
     color: "bg-red-500/20 text-red-400",
+    highlight: false,
+  },
+  {
+    href: "/admin/schedule",
+    label: "Edit Schedule",
+    icon: Clock,
+    color: "bg-green-500/20 text-green-400",
     highlight: false,
   },
   {
@@ -68,21 +78,83 @@ const quickActions = [
   },
 ];
 
+function ProgressBar({ percentage }: { percentage: number }) {
+  return (
+    <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${percentage}%` }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
+      />
+    </div>
+  );
+}
+
+function RoundMatchRow({ match }: { match: Match }) {
+  const isFinished = match.status === "finished";
+  const isLive = match.status === "live";
+  return (
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "h-2 w-2 rounded-full",
+            isFinished ? "bg-green-500" : isLive ? "bg-red-500 animate-pulse" : "bg-zinc-600"
+          )}
+        />
+        <span className="text-sm text-white">
+          {match.team_a || "TBD"} <span className="text-zinc-500">vs</span> {match.team_b || "TBD"}
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        {isFinished && (
+          <span className="text-sm font-bold text-orange-400">
+            {match.score_a} - {match.score_b}
+          </span>
+        )}
+        <StatusBadge status={match.status} />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
-  const { matches } = useMatches();
-  const { match: currentMatch } = useCurrentMatch();
-  const { brackets } = useBrackets();
-  const { teams } = useTeams();
-  const { settings } = useSettings();
+  const {
+    settings,
+    matches,
+    teams,
+    loading,
+    actionLoading,
+    message,
+    tournamentState,
+    currentRoundName,
+    currentMatch,
+    roundProgress,
+    isRoundComplete,
+    canProceedToNextRound,
+    canFinishTournament,
+    champion,
+    startTournament: doStartTournament,
+    proceedToNextRound: doProceedToNextRound,
+    finishTournament: doFinishTournament,
+    resetAll: doResetAll,
+    setMessage,
+  } = useTournament();
 
   const totalMatches = matches.length;
   const liveMatches = matches.filter((m) => m.status === "live").length;
-  const totalTeams = teams.length;
+  const finishedMatches = matches.filter((m) => m.status === "finished").length;
+  const currentRoundMatches = matches
+    .filter((m) => m.round_order === (settings?.current_round_order || 0))
+    .sort((a, b) => a.match_index - b.match_index);
+
+  const stateInfo = STATE_LABELS[tournamentState] || STATE_LABELS.draft;
 
   const stats = [
     {
       label: "Total Teams",
-      value: totalTeams,
+      value: teams.length,
       icon: Users,
       color: "bg-blue-500/20 text-blue-400",
     },
@@ -93,17 +165,16 @@ export default function AdminDashboardPage() {
       color: "bg-orange-500/20 text-orange-400",
     },
     {
+      label: "Finished",
+      value: finishedMatches,
+      icon: CheckCircle2,
+      color: "bg-green-500/20 text-green-400",
+    },
+    {
       label: "Live Now",
       value: liveMatches,
       icon: Zap,
       color: "bg-red-500/20 text-red-400",
-    },
-    {
-      label: "Tournament Status",
-      value: settings?.tournament_status || "pending",
-      icon: Trophy,
-      color: "bg-purple-500/20 text-purple-400",
-      isText: true,
     },
   ];
 
@@ -119,12 +190,135 @@ export default function AdminDashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-white">Tournament Control Panel</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Tournament overview and quick actions
+          Central dashboard — manage tournament state, rounds, and matches
         </p>
       </motion.div>
 
+      {message && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            "rounded-xl px-4 py-3 text-sm",
+            message.includes("Error")
+              ? "border border-red-500/30 bg-red-500/10 text-red-400"
+              : "border border-green-500/30 bg-green-500/10 text-green-400"
+          )}
+        >
+          {message}
+        </motion.div>
+      )}
+
+      {/* ── Tournament Status Banner ─────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+      >
+        <Card className="p-6 bg-gradient-to-r from-zinc-900/80 via-zinc-900/50 to-zinc-900/80 border-zinc-800">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", stateInfo.bg)}>
+                  <Trophy className={cn("h-5 w-5", stateInfo.color)} />
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wider">Tournament State</p>
+                  <p className={cn("text-lg font-bold", stateInfo.color)}>{stateInfo.label}</p>
+                </div>
+              </div>
+
+              {tournamentState === "running" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-zinc-500">Current Round:</span>
+                    <span className="font-semibold text-white">{currentRoundName}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-zinc-500">Progress:</span>
+                    <span className="text-white">
+                      {roundProgress.completed}/{roundProgress.total} matches
+                    </span>
+                    <span className="text-orange-400 font-medium">{roundProgress.percentage}%</span>
+                  </div>
+                  <ProgressBar percentage={roundProgress.percentage} />
+                </div>
+              )}
+
+              {tournamentState === "completed" && champion && (
+                <div className="flex items-center gap-3 mt-2">
+                  <Trophy className="h-5 w-5 text-amber-400" />
+                  <span className="text-lg font-bold bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent">
+                    Champion: {champion.team_name}
+                  </span>
+                </div>
+              )}
+
+              {tournamentState === "draft" && (
+                <p className="text-sm text-zinc-400 mt-1">
+                  Generate a bracket and schedule to get started.
+                </p>
+              )}
+            </div>
+
+            {/* ── Action Buttons ────────────────────── */}
+            <div className="flex flex-wrap gap-3">
+              {tournamentState === "draft" && (
+                <Button
+                  onClick={doStartTournament}
+                  disabled={actionLoading || totalMatches === 0}
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Play className="h-4 w-4" />
+                  Start Tournament
+                </Button>
+              )}
+
+              {tournamentState === "running" && canProceedToNextRound && (
+                <Button
+                  onClick={doProceedToNextRound}
+                  disabled={actionLoading}
+                  className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Proceed to Next Round
+                </Button>
+              )}
+
+              {tournamentState === "running" && canFinishTournament && (
+                <Button
+                  onClick={doFinishTournament}
+                  disabled={actionLoading}
+                  className="gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <Flag className="h-4 w-4" />
+                  Finish Tournament
+                </Button>
+              )}
+
+              {tournamentState !== "draft" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm("Reset entire tournament? This cannot be undone.")) {
+                      doResetAll();
+                    }
+                  }}
+                  disabled={actionLoading}
+                  className="gap-2 border-zinc-700 text-zinc-300 hover:text-red-400 hover:border-red-500/30"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* ── Stats Grid ─────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
@@ -137,19 +331,11 @@ export default function AdminDashboardPage() {
             >
               <Card className="p-5 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-all duration-300">
                 <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.color}`}
-                  >
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.color}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                 </div>
-                <p className="text-2xl font-bold text-white">
-                  {stat.isText ? (
-                    <span className="text-lg capitalize">{stat.value}</span>
-                  ) : (
-                    stat.value
-                  )}
-                </p>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
                 <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
               </Card>
             </motion.div>
@@ -157,6 +343,7 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
+      {/* ── Current Match ──────────────────────────── */}
       {currentMatch && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -168,33 +355,23 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex h-2 w-2 items-center justify-center rounded-full bg-red-500 animate-pulse" />
                 <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">
-                  Live Match
+                  Current Match
                 </span>
                 <Radio className="h-4 w-4 text-red-400 ml-auto" />
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-center">
-                  <p className="text-xl font-bold text-white">
-                    {currentMatch.team_a}
-                  </p>
-                  <p className="text-3xl font-bold text-orange-400 mt-1">
-                    {currentMatch.score_a}
-                  </p>
+                  <p className="text-xl font-bold text-white">{currentMatch.team_a}</p>
+                  <p className="text-3xl font-bold text-orange-400 mt-1">{currentMatch.score_a}</p>
                 </div>
                 <div className="text-center px-6">
                   <p className="text-xs text-zinc-500 mb-1">vs</p>
-                  <StatusBadge status="live" />
-                  <p className="text-xs text-zinc-400 mt-2">
-                    {currentMatch.round}
-                  </p>
+                  <StatusBadge status={currentMatch.status} />
+                  <p className="text-xs text-zinc-400 mt-2">{currentMatch.round}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-white">
-                    {currentMatch.team_b}
-                  </p>
-                  <p className="text-3xl font-bold text-orange-400 mt-1">
-                    {currentMatch.score_b}
-                  </p>
+                  <p className="text-xl font-bold text-white">{currentMatch.team_b}</p>
+                  <p className="text-3xl font-bold text-orange-400 mt-1">{currentMatch.score_b}</p>
                 </div>
               </div>
               <div className="flex items-center justify-center mt-4 text-xs text-zinc-500 group-hover:text-orange-400 transition-colors">
@@ -206,13 +383,33 @@ export default function AdminDashboardPage() {
         </motion.div>
       )}
 
+      {/* ── Current Round Matches ──────────────────── */}
+      {tournamentState === "running" && currentRoundMatches.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Swords className="h-4 w-4 text-orange-400" />
+            {currentRoundName} — Matches
+          </h3>
+          <Card className="bg-zinc-900/50 border-zinc-800 divide-y divide-zinc-800">
+            {currentRoundMatches.map((match) => (
+              <RoundMatchRow key={match.id} match={match} />
+            ))}
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ── Quick Actions ──────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.5 }}
       >
         <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-orange-400" />
+          <Zap className="h-4 w-4 text-orange-400" />
           Quick Actions
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -233,24 +430,14 @@ export default function AdminDashboardPage() {
                         action.highlight ? "h-14 w-14" : ""
                       }`}
                     >
-                      <Icon
-                        className={`h-6 w-6 ${
-                          action.highlight ? "h-7 w-7" : ""
-                        }`}
-                      />
+                      <Icon className={`h-6 w-6 ${action.highlight ? "h-7 w-7" : ""}`} />
                     </div>
                     <div className="flex-1">
-                      <p
-                        className={`font-medium text-white ${
-                          action.highlight ? "text-lg" : "text-sm"
-                        }`}
-                      >
+                      <p className={`font-medium text-white ${action.highlight ? "text-lg" : "text-sm"}`}>
                         {action.label}
                       </p>
                       {action.highlight && (
-                        <p className="text-xs text-orange-400 mt-0.5">
-                          Generate brackets
-                        </p>
+                        <p className="text-xs text-orange-400 mt-0.5">Generate brackets</p>
                       )}
                     </div>
                     <ArrowRight className="h-5 w-5 text-zinc-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
@@ -262,6 +449,7 @@ export default function AdminDashboardPage() {
         </div>
       </motion.div>
 
+      {/* ── Recent Activity ────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

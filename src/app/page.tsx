@@ -23,12 +23,7 @@ import { PageWrapper } from "@/components/shared/page-wrapper";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useCurrentMatch } from "@/hooks/use-matches";
-import { useNextMatch } from "@/hooks/use-matches";
-import { useSettings } from "@/hooks/use-settings";
-import { useMatches } from "@/hooks/use-matches";
-import { useBrackets } from "@/hooks/use-brackets";
-import { useTeams } from "@/hooks/use-teams";
+import { useTournament } from "@/hooks/use-tournament";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 
 const fadeUp: Variants = {
@@ -72,12 +67,13 @@ const STATUS_MAP: Record<string, "waiting" | "live" | "finished"> = {
 };
 
 export default function HomePage() {
-  const { match: currentMatch } = useCurrentMatch();
-  const { match: nextMatch } = useNextMatch();
-  const { settings } = useSettings();
-  const { brackets } = useBrackets();
-  const { teams } = useTeams();
-  const { matches } = useMatches();
+  const { currentMatch, matches, teams, settings, loading } = useTournament();
+
+  const nextMatch = !currentMatch
+    ? matches
+        .filter((m) => m.status === "waiting" && m.team_a_id && m.team_b_id)
+        .sort((a, b) => a.round_order - b.round_order || a.match_index - b.match_index)[0] || null
+    : null;
 
   const totalMatches = matches.length;
   const tournamentStatus = settings?.tournament_status ?? "upcoming";

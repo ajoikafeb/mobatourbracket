@@ -1,0 +1,434 @@
+import type { Settings, Match, Team, TournamentState } from "@/lib/types";
+import type { EngineBracket, EngineMatch, EngineTeam, EngineRound } from "./types";
+import { getRoundName, ROUND_ORDER } from "./types";
+import { determineBracketSize, computeStats } from "./bracket-engine";
+import { mapTeamFromDB } from "./mapping";
+
+export interface RoundProgress {
+  completed: number;
+  total: number;
+  percentage: number;
+}
+
+export interface TournamentSnapshot {
+  tournamentState: TournamentState;
+  currentRoundOrder: number;
+  currentRoundName: string;
+  currentMatch: Match | null;
+  roundProgress: RoundProgress;
+  isRoundComplete: boolean;
+  canProceedToNextRound: boolean;
+  canFinishTournament: boolean;
+  bracketSize: number;
+  totalRounds: number;
+  champion: Team | null;
+}
+
+// ── Pure Read Operations ──────────────────────────────────
+
+export function getBracketSize(teamCount: number): number {
+  return determineBracketSize(teamCount);
+}
+
+export function getTotalRounds(bracketSize: number): number {
+  return Math.log2(bracketSize);
+}
+
+export function getCurrentRoundName(settings: Settings, matches: Match[]): string {
+  if (matches.length === 0) return "N/A";
+  const bracketSize = getBracketSizeFromMatches(matches);
+  return getRoundName(bracketSize, settings.current_round_order);
+}
+
+export function getRoundMatches(matches: Match[], roundOrder: number): Match[] {
+  return matches
+    .filter((m) => m.round_order === roundOrder)
+    .sort((a, b) => a.match_index - b.match_index);
+}
+
+export function getRoundProgress(settings: Settings, matches: Match[]): RoundProgress {
+  const roundMatches = getRoundMatches(matches, settings.current_round_order);
+  const total = roundMatches.length;
+  const completed = roundMatches.filter((m) => m.status === "finished").length;
+  return {
+    completed,
+    total,
+    percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+  };
+}
+
+export function isRoundComplete(settings: Settings, matches: Match[]): boolean {
+  const progress = getRoundProgress(settings, matches);
+  return progress.total > 0 && progress.completed === progress.total;
+}
+
+export function canProceedToNextRound(settings: Settings, matches: Match[]): boolean {
+  if (settings.tournament_state !== "running") return false;
+  if (!isRoundComplete(settings, matches)) return false;
+  const bracketSize = getBracketSizeFromMatches(matches);
+  const totalRounds = getTotalRounds(bracketSize);
+  return settings.current_round_order < totalRounds - 1;
+}
+
+export function canFinishTournament(settings: Settings, matches: Match[]): boolean {
+  if (settings.tournament_state !== "running") return false;
+  return isRoundComplete(settings, matches) && !canProceedToNextRound(settings, matches);
+}
+
+export function getCurrentMatchFromSettings(settings: Settings, matches: Match[]): Match | null {
+  if (!settings.current_match_id) return null;
+  return matches.find((m) => m.id === settings.current_match_id) || null;
+}
+
+export function findChampion(matches: Match[], teams: Team[]): Team | null {
+  const grandFinal = matches.find(
+    (m) => m.round === "Grand Final" && m.status === "finished" && m.winner_id
+  );
+  if (!grandFinal?.winner_id) return null;
+  return teams.find((t) => t.id === grandFinal.winner_id) || null;
+}
+
+export function buildTournamentSnapshot(
+  settings: Settings,
+  matches: Match[],
+  teams: Team[]
+): TournamentSnapshot {
+  const bracketSize = getBracketSizeFromMatches(matches);
+  const totalRounds = getTotalRounds(bracketSize);
+  const roundProgress = getRoundProgress(settings, matches);
+  const isRoundComplete_ = isRoundComplete(settings, matches);
+  const canProceed = canProceedToNextRound(settings, matches);
+  const canFinish = canFinishTournament(settings, matches);
+  const currentMatch = getCurrentMatchFromSettings(settings, matches);
+  const champion = findChampion(matches, teams);
+
+  return {
+    tournamentState: settings.tournament_state || "draft",
+    currentRoundOrder: settings.current_round_order || 0,
+    currentRoundName: getCurrentRoundName(settings, matches),
+    currentMatch,
+    roundProgress,
+    isRoundComplete: isRoundComplete_,
+    canProceedToNextRound: canProceed,
+    canFinishTournament: canFinish,
+    bracketSize,
+    totalRounds,
+    champion,
+  };
+}
+
+// ── Bracket Reconstruction from DB ────────────────────────
+
+export function reconstructBracketFromDB(
+  matches: Match[],
+  teams: Team[],
+  bestOf: number
+): EngineBracket {
+  if (matches.length === 0) return emptyBracket();
+
+  const bracketSize = getBracketSizeFromMatches(matches);
+  const totalRounds = getTotalRounds(bracketSize);
+  const teamMap = new Map(teams.map((t) => [t.id, t]));
+
+  const rounds: EngineRound[] = [];
+  const allMatches: EngineMatch[] = [];
+
+  for (let roundIdx = 0; roundIdx < totalRounds; roundIdx++) {
+    const name = getRoundName(bracketSize, roundIdx);
+    rounds.push({ name, order: roundIdx, matches: [] });
+  }
+  rounds.push({ name: "Champion", order: totalRounds, matches: [] });
+
+  const round0Matches = matches.filter((m) => m.round_order === 0);
+  let matchNumber = 1;
+
+  for (let roundIdx = 0; roundIdx <= totalRounds; roundIdx++) {
+    const roundMatches = matches
+      .filter((m) => m.round_order === roundIdx)
+      .sort((a, b) => a.match_index - b.match_index);
+
+    for (const dbMatch of roundMatches) {
+      const teamA = dbMatch.team_a_id ? teamMap.get(dbMatch.team_a_id) || null : null;
+      const teamB = dbMatch.team_b_id ? teamMap.get(dbMatch.team_b_id) || null : null;
+
+      const engineTeamA = teamA ? mapTeamFromDB(teamA, dbMatch.winner_id != null && dbMatch.winner_id !== dbMatch.team_a_id) : null;
+      const engineTeamB = teamB ? mapTeamFromDB(teamB, dbMatch.winner_id != null && dbMatch.winner_id !== dbMatch.team_b_id) : null;
+
+      const nextRoundOrder = roundIdx + 1;
+      const nextMatchIndex = Math.floor(dbMatch.match_index / 2);
+      const nextSlot: "A" | "B" = dbMatch.match_index % 2 === 0 ? "A" : "B";
+
+      const nextMatch = nextRoundOrder < totalRounds
+        ? matches.find(
+            (m) => m.round_order === nextRoundOrder && m.match_index === nextMatchIndex
+          )
+        : null;
+
+      const engineMatch: EngineMatch = {
+        id: dbMatch.id,
+        round: dbMatch.round as EngineMatch["round"],
+        roundOrder: roundIdx,
+        matchIndex: dbMatch.match_index,
+        matchNumber: matchNumber++,
+        teamA: engineTeamA,
+        teamB: engineTeamB,
+        scoreA: dbMatch.score_a,
+        scoreB: dbMatch.score_b,
+        status: dbMatch.status as EngineMatch["status"],
+        winnerId: dbMatch.winner_id,
+        loserId: null,
+        scheduledTime: dbMatch.match_date,
+        bestOf: dbMatch.best_of || bestOf,
+        nextMatchId: nextMatch?.id || null,
+        nextSlot: nextRoundOrder < totalRounds ? nextSlot : null,
+      };
+
+      if (rounds[roundIdx]) {
+        rounds[roundIdx].matches.push(engineMatch);
+      }
+      allMatches.push(engineMatch);
+    }
+  }
+
+  const champion = findChampion(matches, Array.from(teamMap.values()));
+  const stats = computeStats(allMatches);
+
+  return {
+    teams: teams.map((t) => mapTeamFromDB(t)),
+    rounds,
+    matches: allMatches,
+    champion: champion ? mapTeamFromDB(champion) : null,
+    stats,
+    config: {
+      bracketSize,
+      totalByes: bracketSize - round0Matches.length * 2,
+      bestOf,
+      seedingMode: "imported",
+    },
+  };
+}
+
+// ── Write Operations ──────────────────────────────────────
+
+export async function startTournament(
+  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  settingsId: string
+): Promise<Error | null> {
+  const { error } = await supabase
+    .from("settings")
+    .update({
+      tournament_state: "running",
+      tournament_status: "ongoing",
+      current_round_order: 0,
+    })
+    .eq("id", settingsId);
+  return error ? new Error(String(error)) : null;
+}
+
+export async function proceedToNextRound(
+  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  settingsId: string,
+  currentRoundOrder: number
+): Promise<Error | null> {
+  const { error } = await supabase
+    .from("settings")
+    .update({
+      current_round_order: currentRoundOrder + 1,
+      current_match_id: null,
+    })
+    .eq("id", settingsId);
+  return error ? new Error(String(error)) : null;
+}
+
+export async function finishTournament(
+  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  settingsId: string
+): Promise<Error | null> {
+  const { error } = await supabase
+    .from("settings")
+    .update({
+      tournament_state: "completed",
+      tournament_status: "completed",
+    })
+    .eq("id", settingsId);
+  return error ? new Error(String(error)) : null;
+}
+
+export async function setCurrentMatchId(
+  supabase: { from: (table: string) => { update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> } } },
+  settingsId: string,
+  matchId: string | null
+): Promise<Error | null> {
+  const { error } = await supabase
+    .from("settings")
+    .update({ current_match_id: matchId })
+    .eq("id", settingsId);
+  return error ? new Error(String(error)) : null;
+}
+
+export async function saveMatchResult(
+  supabase: {
+    from: (table: string) => {
+      update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> };
+      select: () => { eq: (col: string, val: unknown) => { single: () => Promise<{ data: Match | null; error: unknown }> } };
+    }
+  },
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+  winnerId: string | null,
+  winnerName: string | null,
+  matches: Match[]
+): Promise<Error | null> {
+  const match = matches.find((m) => m.id === matchId);
+  if (!match) return new Error("Match not found");
+
+  const { error: updateErr } = await supabase
+    .from("matches")
+    .update({
+      score_a: scoreA,
+      score_b: scoreB,
+      winner_id: winnerId,
+      winner: winnerName,
+      status: "finished",
+    })
+    .eq("id", matchId);
+  if (updateErr) return new Error(String(updateErr));
+
+  if (winnerId) {
+    const nextRoundOrder = match.round_order + 1;
+    const nextMatchIndex = Math.floor(match.match_index / 2);
+    const slot = match.match_index % 2 === 0 ? "team_a_id" : "team_b_id";
+    const slotName = match.match_index % 2 === 0 ? "team_a" : "team_b";
+
+    const nextMatch = matches.find(
+      (m) => m.round_order === nextRoundOrder && m.match_index === nextMatchIndex
+    );
+
+    if (nextMatch) {
+      const { error: advErr } = await supabase
+        .from("matches")
+        .update({
+          [slot]: winnerId,
+          [slotName]: winnerName || "",
+        })
+        .eq("id", nextMatch.id);
+      if (advErr) return new Error(String(advErr));
+    }
+  }
+
+  return null;
+}
+
+export async function resetMatchResult(
+  supabase: {
+    from: (table: string) => {
+      update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> };
+    }
+  },
+  matchId: string,
+  matches: Match[]
+): Promise<Error | null> {
+  const match = matches.find((m) => m.id === matchId);
+  if (!match) return new Error("Match not found");
+
+  const { error: resetErr } = await supabase
+    .from("matches")
+    .update({
+      score_a: 0,
+      score_b: 0,
+      winner_id: null,
+      winner: null,
+      status: "waiting",
+    })
+    .eq("id", matchId);
+  if (resetErr) return new Error(String(resetErr));
+
+  if (match.winner_id) {
+    const nextRoundOrder = match.round_order + 1;
+    const nextMatchIndex = Math.floor(match.match_index / 2);
+    const slot = match.match_index % 2 === 0 ? "team_a_id" : "team_b_id";
+    const slotName = match.match_index % 2 === 0 ? "team_a" : "team_b";
+
+    const nextMatch = matches.find(
+      (m) => m.round_order === nextRoundOrder && m.match_index === nextMatchIndex
+    );
+
+    if (nextMatch && nextMatch[slot as keyof Match] === match.winner_id) {
+      const { error: clearErr } = await supabase
+        .from("matches")
+        .update({
+          [slot]: null,
+          [slotName]: "",
+        })
+        .eq("id", nextMatch.id);
+      if (clearErr) return new Error(String(clearErr));
+    }
+  }
+
+  return null;
+}
+
+export async function resetAllMatches(
+  supabase: {
+    from: (table: string) => {
+      update: (data: Record<string, unknown>) => { eq: (col: string, val: unknown) => Promise<{ error: unknown }> };
+      select: () => { eq?: (col: string, val: unknown) => Promise<{ data: unknown; error: unknown }> };
+    }
+  },
+  settingsId: string,
+  matches: Match[]
+): Promise<Error | null> {
+  for (const match of matches) {
+    const update: Record<string, unknown> = {
+      score_a: 0,
+      score_b: 0,
+      winner_id: null,
+      winner: null,
+      status: "waiting",
+    };
+
+    if (match.round_order > 0) {
+      update.team_a_id = null;
+      update.team_a = "";
+      update.team_b_id = null;
+      update.team_b = "";
+    }
+
+    const { error } = await supabase
+      .from("matches")
+      .update(update)
+      .eq("id", match.id);
+    if (error) return new Error(String(error));
+  }
+
+  const { error: settingsErr } = await supabase
+    .from("settings")
+    .update({
+      current_round_order: 0,
+      current_match_id: null,
+    })
+    .eq("id", settingsId);
+  if (settingsErr) return new Error(String(settingsErr));
+
+  return null;
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+function getBracketSizeFromMatches(matches: Match[]): number {
+  const round0Count = matches.filter((m) => m.round_order === 0).length;
+  if (round0Count === 0) return 2;
+  return round0Count * 2;
+}
+
+function emptyBracket(): EngineBracket {
+  return {
+    teams: [],
+    rounds: [],
+    matches: [],
+    champion: null,
+    stats: { totalMatches: 0, completedMatches: 0, liveMatches: 0, waitingMatches: 0, progress: 0 },
+    config: { bracketSize: 0, totalByes: 0, bestOf: 3, seedingMode: "imported" },
+  };
+}

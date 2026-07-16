@@ -51,3 +51,27 @@ export {
   mapMatchToDB,
   mapMatchFromDB,
 } from "./mapping";
+
+export {
+  buildTournamentSnapshot,
+  reconstructBracketFromDB,
+  getBracketSize,
+  getTotalRounds,
+  getCurrentRoundName,
+  getRoundMatches,
+  getRoundProgress,
+  isRoundComplete,
+  canProceedToNextRound,
+  canFinishTournament,
+  getCurrentMatchFromSettings,
+  findChampion,
+  startTournament,
+  proceedToNextRound,
+  finishTournament,
+  setCurrentMatchId,
+  saveMatchResult,
+  resetMatchResult,
+  resetAllMatches,
+} from "./tournament-service";
+
+export type { TournamentSnapshot, RoundProgress } from "./tournament-service";

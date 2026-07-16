@@ -66,6 +66,8 @@ export interface BracketWithTeam extends Bracket {
   team: Team | null;
 }
 
+export type TournamentState = "draft" | "ready" | "running" | "completed";
+
 export interface Settings {
   id: string;
   tournament_name: string;
@@ -73,6 +75,9 @@ export interface Settings {
   tournament_logo: string | null;
   tournament_banner: string | null;
   tournament_status: "upcoming" | "ongoing" | "completed";
+  tournament_state: TournamentState;
+  current_round_order: number;
+  current_match_id: string | null;
   tournament_start_date: string | null;
   match_duration_minutes: number;
   break_duration_minutes: number;
