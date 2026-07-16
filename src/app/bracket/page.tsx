@@ -10,7 +10,7 @@ import { PageWrapper } from "@/components/shared/page-wrapper";
 import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useTeams } from "@/hooks/use-teams";
-import { useBracketsWithTeams } from "@/hooks/use-brackets";
+import { useMatches } from "@/hooks/use-matches";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import type { BracketWithTeam, Team } from "@/lib/types";
@@ -482,10 +482,64 @@ function TeamDetailSheet({
 }
 
 export default function BracketPage() {
-  const { teams } = useTeams();
-  const { brackets, loading } = useBracketsWithTeams(teams);
+  const { teams, loading: teamsLoading } = useTeams();
+  const { matches, loading: matchesLoading } = useMatches();
   const { settings } = useSettings();
 
+  const brackets = useMemo(() => {
+    if (teams.length === 0 || matches.length === 0) return [];
+
+    const teamMap = new Map(teams.map((t) => [t.id, t]));
+    const result: BracketWithTeam[] = [];
+
+    for (const match of matches) {
+      if (match.team_a_id && match.team_a) {
+        const team = teamMap.get(match.team_a_id) || null;
+        result.push({
+          id: `${match.id}-a`,
+          round: match.round,
+          round_order: match.round_order,
+          position: match.match_index * 2,
+          team_name: match.team_a,
+          team_seed: team?.seed || 0,
+          team_id: match.team_a_id,
+          opponent_id: match.team_b_id,
+          match_id: match.id,
+          is_winner: match.winner_id === match.team_a_id,
+          is_current: match.status === "live",
+          is_bye: match.team_a === "BYE",
+          created_at: match.created_at,
+          updated_at: match.updated_at,
+          team,
+        });
+      }
+
+      if (match.team_b_id && match.team_b) {
+        const team = teamMap.get(match.team_b_id) || null;
+        result.push({
+          id: `${match.id}-b`,
+          round: match.round,
+          round_order: match.round_order,
+          position: match.match_index * 2 + 1,
+          team_name: match.team_b,
+          team_seed: team?.seed || 0,
+          team_id: match.team_b_id,
+          opponent_id: match.team_a_id,
+          match_id: match.id,
+          is_winner: match.winner_id === match.team_b_id,
+          is_current: match.status === "live",
+          is_bye: match.team_b === "BYE",
+          created_at: match.created_at,
+          updated_at: match.updated_at,
+          team,
+        });
+      }
+    }
+
+    return result;
+  }, [teams, matches]);
+
+  const loading = teamsLoading || matchesLoading;
   const [hoveredBracket, setHoveredBracket] = useState<BracketWithTeam | null>(null);
   const [selectedBracket, setSelectedBracket] = useState<BracketWithTeam | null>(null);
 
