@@ -28,13 +28,15 @@ import type { Match } from "@/lib/types";
 
 type EditMatch = Partial<Match> & { id: string };
 
-const ROUND_OPTIONS = ["Round of 16", "Quarter Final", "Semi Final", "Grand Final"];
+const ROUND_OPTIONS = ["Round of 64", "Round of 32", "Round of 16", "Quarter Final", "Semi Final", "Grand Final"];
 const STATUS_OPTIONS = ["waiting", "live", "finished"] as const;
 const BO_OPTIONS = [1, 3, 5];
 
 function toLocalDatetime(iso: string | null | undefined): string {
   if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 16);
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function fromLocalDatetime(val: string): string {
@@ -139,7 +141,7 @@ export default function AdminSchedulePage() {
           </div>
           <div className="flex items-center gap-3">
             <Link
-              href="/admin/schedule/generate"
+              href="/admin/schedule-generator"
               className="flex items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-orange-400"
             >
               <Wand2 className="h-4 w-4" />

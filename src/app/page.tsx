@@ -26,6 +26,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useCurrentMatch } from "@/hooks/use-matches";
 import { useNextMatch } from "@/hooks/use-matches";
 import { useSettings } from "@/hooks/use-settings";
+import { useMatches } from "@/hooks/use-matches";
 import { useBrackets } from "@/hooks/use-brackets";
 import { useTeams } from "@/hooks/use-teams";
 import { cn, formatDate, formatTime } from "@/lib/utils";
@@ -76,8 +77,9 @@ export default function HomePage() {
   const { settings } = useSettings();
   const { brackets } = useBrackets();
   const { teams } = useTeams();
+  const { matches } = useMatches();
 
-  const totalMatches = brackets.length;
+  const totalMatches = matches.length;
   const tournamentStatus = settings?.tournament_status ?? "upcoming";
   const mappedStatus = STATUS_MAP[tournamentStatus] ?? "waiting";
 

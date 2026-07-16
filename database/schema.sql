@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS teams (
   player_3 TEXT NOT NULL DEFAULT '',
   player_4 TEXT NOT NULL DEFAULT '',
   player_5 TEXT NOT NULL DEFAULT '',
+  player_6 TEXT NOT NULL DEFAULT '',
   substitute TEXT,
   seed INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),

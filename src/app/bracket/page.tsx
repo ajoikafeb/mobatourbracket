@@ -21,7 +21,7 @@ import { useTeams } from "@/hooks/use-teams";
 import { useBracketsWithTeams } from "@/hooks/use-brackets";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
-import type { BracketWithTeam } from "@/lib/types";
+import type { BracketWithTeam, Team } from "@/lib/types";
 import { ROUND_CONFIG, ROUND_ORDER } from "@/lib/types";
 
 function getInitials(name: string) {
@@ -33,18 +33,23 @@ function getInitials(name: string) {
     .slice(0, 2);
 }
 
-function getTeamPlayers(bracket: BracketWithTeam) {
+function getTeamPlayers(bracket: BracketWithTeam, playersPerTeam?: number) {
   const team = bracket.team;
   if (!team) return [];
-  return [
+  const allPlayers = [
     { role: "Captain", name: team.captain },
     { role: "Player 1", name: team.player_1 },
     { role: "Player 2", name: team.player_2 },
     { role: "Player 3", name: team.player_3 },
     { role: "Player 4", name: team.player_4 },
     { role: "Player 5", name: team.player_5 },
+    { role: "Player 6", name: (team as Team & { player_6?: string }).player_6 },
     ...(team.substitute ? [{ role: "Substitute", name: team.substitute }] : []),
   ].filter((p) => p.name);
+  if (playersPerTeam) {
+    return allPlayers.slice(0, playersPerTeam);
+  }
+  return allPlayers;
 }
 
 function getActiveRounds(brackets: BracketWithTeam[]) {
@@ -386,11 +391,13 @@ function RoundConnector({ roundIndex }: { roundIndex: number }) {
 function TeamDetailSheet({
   bracket,
   onClose,
+  playersPerTeam,
 }: {
   bracket: BracketWithTeam;
   onClose: () => void;
+  playersPerTeam?: number;
 }) {
-  const players = getTeamPlayers(bracket);
+  const players = getTeamPlayers(bracket, playersPerTeam);
   const isChampion = bracket.round === "Champion";
 
   return (
@@ -648,6 +655,7 @@ export default function BracketPage() {
             key={selectedBracket.id}
             bracket={selectedBracket}
             onClose={handleClose}
+            playersPerTeam={settings?.players_per_team}
           />
         )}
       </AnimatePresence>

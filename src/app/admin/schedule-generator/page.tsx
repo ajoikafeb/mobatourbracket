@@ -178,12 +178,28 @@ export default function ScheduleGeneratorPage() {
     setSaving(true);
     setError("");
     try {
+      const { data: existingTeams } = await supabase.from("teams").select("id, team_name");
+      const teamIdMap = new Map<string, string>();
+      if (existingTeams) {
+        for (const t of existingTeams) teamIdMap.set(t.team_name, t.id);
+      }
+
+      const { data: existingBrackets } = await supabase.from("brackets").select("id, round, position, team_name");
+      const bracketIdMap = new Map<string, string>();
+      if (existingBrackets) {
+        for (const b of existingBrackets) {
+          bracketIdMap.set(`${b.round}-${b.position}`, b.id);
+        }
+      }
+
       await supabase.from("matches").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       const matchInserts = schedule
         .filter((m) => m.awayTeam !== "BYE")
         .map((m) => ({
           team_a: m.homeTeam,
           team_b: m.awayTeam,
+          team_a_id: teamIdMap.get(m.homeTeam) || null,
+          team_b_id: teamIdMap.get(m.awayTeam) || null,
           round: m.round,
           match_date: m.startTime.toISOString(),
           best_of: bestOf,

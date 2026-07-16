@@ -375,7 +375,7 @@ export default function AdminBracketPage() {
             <p className="text-zinc-400 text-sm mb-4">
               No rounds yet. Generate a bracket to get started.
             </p>
-            <Link href="/admin/generate">
+          <Link href="/admin/tournament-generator">
               <Button className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
                 <Wand2 className="h-4 w-4" />
                 Generate from players

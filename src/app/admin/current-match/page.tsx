@@ -79,13 +79,72 @@ export default function AdminCurrentMatchPage() {
     setSaving(true);
     setMessage("");
     try {
+      const match = matches.find((m) => m.id === selectedId);
+      const winnerTeamName = winner || null;
+      let winnerTeamId: string | null = null;
+      if (winnerTeamName && match) {
+        winnerTeamId =
+          winnerTeamName === match.team_a ? match.team_a_id :
+          winnerTeamName === match.team_b ? match.team_b_id : null;
+      }
+
       const { error } = await supabase
         .from("matches")
-        .update({ status, score_a: scoreA, score_b: scoreB, winner: winner || null })
+        .update({ status, score_a: scoreA, score_b: scoreB, winner: winnerTeamName, winner_id: winnerTeamId })
         .eq("id", selectedId);
       if (error) throw error;
+
+      if (status === "finished" && winnerTeamName && winnerTeamId) {
+        const { data: brackets } = await supabase
+          .from("brackets")
+          .select("id, round, position, match_id")
+          .eq("match_id", selectedId);
+
+        if (brackets && brackets.length > 0) {
+          const currentBracket = brackets[0];
+          const { data: nextBrackets } = await supabase
+            .from("brackets")
+            .select("id, round, position, match_id")
+            .gt("round_order", currentBracket.round ?? "")
+            .limit(2);
+
+          if (nextBrackets && nextBrackets.length > 0) {
+            const targetBracket = nextBrackets.find(
+              (b: { position: number }) => b.position === Math.floor(currentBracket.position / 2)
+            ) || nextBrackets[0];
+
+            if (targetBracket) {
+              await supabase
+                .from("brackets")
+                .update({ team_name: winnerTeamName, team_id: winnerTeamId })
+                .eq("id", targetBracket.id);
+
+              if (targetBracket.match_id) {
+                const { data: nextMatch } = await supabase
+                  .from("matches")
+                  .select("team_a, team_a_id, team_b, team_b_id")
+                  .eq("id", targetBracket.match_id)
+                  .single();
+
+                if (nextMatch) {
+                  const isTeamA = targetBracket.position % 2 === 0;
+                  await supabase
+                    .from("matches")
+                    .update(
+                      isTeamA
+                        ? { team_a: winnerTeamName, team_a_id: winnerTeamId }
+                        : { team_b: winnerTeamName, team_b_id: winnerTeamId }
+                    )
+                    .eq("id", targetBracket.match_id);
+                }
+              }
+            }
+          }
+        }
+      }
+
       await refetch();
-      showMsg("Match updated successfully!");
+      showMsg("Match updated and bracket advanced!");
     } catch {
       showMsg("Error updating match. Please try again.");
     } finally {

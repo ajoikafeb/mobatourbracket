@@ -17,6 +17,7 @@ export interface Team {
   player_3: string;
   player_4: string;
   player_5: string;
+  player_6: string;
   substitute: string | null;
   seed: number;
   created_at: string;

@@ -35,7 +35,7 @@ export default function AdminSettingsPage() {
   const [footerText, setFooterText] = useState("");
   const [startDate, setStartDate] = useState("");
   const [matchDuration, setMatchDuration] = useState("45");
-  const [breakDuration, setBreakDuration] = useState("10");
+  const [breakDuration, setBreakDuration] = useState("15");
   const [bestOf, setBestOf] = useState("3");
   const [playersPerTeam, setPlayersPerTeam] = useState("5");
   const [timezone, setTimezone] = useState("");

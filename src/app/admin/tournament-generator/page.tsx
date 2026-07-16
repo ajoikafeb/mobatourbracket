@@ -15,7 +15,10 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
-  Copy,
+  AlertTriangle,
+  Dice5,
+  ListOrdered,
+  Import,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -23,284 +26,68 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useTeams } from "@/hooks/use-teams";
+import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
-import type { Team, RoundName } from "@/lib/types";
+import type { Team } from "@/lib/types";
+import {
+  parsePlayers,
+  generateTeams,
+  generateBracket,
+  validateTournament,
+  determineBracketSize,
+  mapTeamToDB,
+  mapBracketToDB,
+  mapMatchToDB,
+  type EngineTeam,
+  type SeedingMode,
+  type PlayerImportResult,
+  type TeamGenerationResult,
+} from "@/engine";
 
-const ROUND_ORDER: RoundName[] = [
-  "Round of 64",
-  "Round of 32",
-  "Round of 16",
-  "Quarter Final",
-  "Semi Final",
-  "Grand Final",
-  "Champion",
+const SEEDING_OPTIONS: { value: SeedingMode; label: string; icon: typeof Import }[] = [
+  { value: "imported", label: "Import Order", icon: ListOrdered },
+  { value: "random", label: "Random Seed", icon: Dice5 },
 ];
-
-const STEP_LABELS = [
-  { label: "Paste Players", icon: Users },
-  { label: "Preview Teams", icon: Sparkles },
-  { label: "Edit Teams", icon: Shuffle },
-  { label: "Save & Generate", icon: Download },
-];
-
-function parseUsernames(raw: string): string[] {
-  return raw
-    .split("\n")
-    .map((line) => line.replace(/^@/, "").trim())
-    .filter((line) => line.length > 0)
-    .map((name) => name.replace(/\s+/g, " "))
-    .filter((name, i, arr) => arr.indexOf(name) === i);
-}
-
-function generateTeamGroups(
-  players: string[],
-  perTeam: number
-): Array<{ name: string; players: string[] }> {
-  const teams: Array<{ name: string; players: string[] }> = [];
-  for (let i = 0; i < players.length; i += perTeam) {
-    const chunk = players.slice(i, i + perTeam);
-    teams.push({ name: `Team ${teams.length + 1}`, players: chunk });
-  }
-  return teams;
-}
-
-function getBracketSize(teamCount: number): number {
-  let size = 2;
-  while (size < teamCount) size *= 2;
-  return size;
-}
-
-function getRoundName(size: number): RoundName | null {
-  if (size === 64) return "Round of 64";
-  if (size === 32) return "Round of 32";
-  if (size === 16) return "Round of 16";
-  if (size === 8) return "Quarter Final";
-  if (size === 4) return "Semi Final";
-  if (size === 2) return "Grand Final";
-  return null;
-}
-
-function getRoundsForBracket(bracketSize: number): RoundName[] {
-  const rounds: RoundName[] = [];
-  let size = bracketSize;
-  while (size >= 2) {
-    const name = getRoundName(size);
-    if (name) rounds.push(name);
-    size /= 2;
-  }
-  rounds.push("Champion");
-  return rounds;
-}
-
-function buildSeededPairs(n: number): [number, number][] {
-  if (n <= 1) return [];
-  const pairs: [number, number][] = [];
-  const order = seededOrder(n);
-  for (let i = 0; i < n / 2; i++) {
-    pairs.push([order[i * 2], order[i * 2 + 1]]);
-  }
-  return pairs;
-}
-
-function seededOrder(n: number): number[] {
-  if (n === 1) return [0];
-  const half = n / 2;
-  const prev = seededOrder(half);
-  const result: number[] = [];
-  for (const s of prev) {
-    result.push(s);
-    result.push(n - 1 - s);
-  }
-  return result;
-}
-
-function buildBracket(
-  teamNames: string[],
-  teamIds: string[]
-): { bracketSlots: BracketSlot[]; matchRows: MatchRow[] } {
-  const totalTeams = teamNames.length;
-  const bracketSize = getBracketSize(totalTeams);
-  const rounds = getRoundsForBracket(bracketSize);
-
-  const bracketSlots: BracketSlot[] = [];
-  const matchRows: MatchRow[] = [];
-
-  let pos = 0;
-  for (const round of rounds) {
-    const roundSize =
-      round === "Champion"
-        ? 1
-        : round === "Grand Final"
-        ? 2
-        : round === "Semi Final"
-        ? 4
-        : round === "Quarter Final"
-        ? 8
-        : round === "Round of 16"
-        ? 16
-        : round === "Round of 32"
-        ? 32
-        : 64;
-
-    for (let i = 0; i < roundSize; i++) {
-      bracketSlots.push({
-        round,
-        round_order: ROUND_ORDER.indexOf(round),
-        position: pos++,
-        team_name: "",
-        team_seed: 0,
-        team_id: null,
-        is_bye: false,
-        is_winner: false,
-        is_current: false,
-      });
-    }
-  }
-
-  const firstRoundName = getRoundName(bracketSize)!;
-  const firstRoundSlots = bracketSlots.filter((b) => b.round === firstRoundName);
-
-  const order = seededOrder(bracketSize);
-  for (let i = 0; i < bracketSize; i++) {
-    const seedIdx = order[i];
-    if (seedIdx < totalTeams) {
-      firstRoundSlots[i].team_name = teamNames[seedIdx];
-      firstRoundSlots[i].team_seed = seedIdx + 1;
-      firstRoundSlots[i].team_id = teamIds[seedIdx];
-    } else {
-      firstRoundSlots[i].team_name = "BYE";
-      firstRoundSlots[i].is_bye = true;
-      firstRoundSlots[i].team_seed = seedIdx + 1;
-    }
-  }
-
-  let matchIndex = 0;
-  let currentRoundSize = bracketSize;
-
-  while (currentRoundSize >= 2) {
-    const roundName = getRoundName(currentRoundSize)!;
-    const roundSlots = bracketSlots.filter((b) => b.round === roundName);
-    const nextRoundName =
-      currentRoundSize === 2 ? "Champion" : getRoundName(currentRoundSize / 2)!;
-    const nextRoundSlots = bracketSlots.filter((b) => b.round === nextRoundName);
-
-    const pairs = buildSeededPairs(currentRoundSize);
-
-    for (const [a, b] of pairs) {
-      const slotA = roundSlots[a];
-      const slotB = roundSlots[b];
-
-      const isByeA = slotA.is_bye || !slotA.team_name;
-      const isByeB = slotB.is_bye || !slotB.team_name;
-
-      if (isByeA && !isByeB) {
-        const nextSlot = nextRoundSlots.find((s) => !s.team_name);
-        if (nextSlot) {
-          nextSlot.team_name = slotB.team_name;
-          nextSlot.team_seed = slotB.team_seed;
-          nextSlot.team_id = slotB.team_id;
-        }
-      } else if (!isByeA && isByeB) {
-        const nextSlot = nextRoundSlots.find((s) => !s.team_name);
-        if (nextSlot) {
-          nextSlot.team_name = slotA.team_name;
-          nextSlot.team_seed = slotA.team_seed;
-          nextSlot.team_id = slotA.team_id;
-        }
-      } else if (!isByeA && !isByeB) {
-        matchRows.push({
-          team_a: slotA.team_name,
-          team_a_id: slotA.team_id,
-          team_b: slotB.team_name,
-          team_b_id: slotB.team_id,
-          score_a: 0,
-          score_b: 0,
-          status: "waiting",
-          round: roundName,
-          round_order: ROUND_ORDER.indexOf(roundName),
-          match_index: matchIndex++,
-          match_date: new Date().toISOString(),
-          best_of: 3,
-          winner: null,
-          winner_id: null,
-          bracket_slot: null,
-        });
-      }
-    }
-
-    currentRoundSize /= 2;
-  }
-
-  return { bracketSlots, matchRows };
-}
-
-interface BracketSlot {
-  round: RoundName;
-  round_order: number;
-  position: number;
-  team_name: string;
-  team_seed: number;
-  team_id: string | null;
-  is_bye: boolean;
-  is_winner: boolean;
-  is_current: boolean;
-}
-
-interface MatchRow {
-  team_a: string;
-  team_a_id: string | null;
-  team_b: string;
-  team_b_id: string | null;
-  score_a: number;
-  score_b: number;
-  status: "waiting";
-  round: string;
-  round_order: number;
-  match_index: number;
-  match_date: string;
-  best_of: number;
-  winner: string | null;
-  winner_id: string | null;
-  bracket_slot: number | null;
-}
 
 export default function TournamentGeneratorPage() {
   const { refetch } = useTeams();
+  const { settings } = useSettings();
   const supabase = createClient();
 
   const [step, setStep] = useState(1);
   const [rawText, setRawText] = useState("");
-  const [players, setPlayers] = useState<string[]>([]);
-  const [teams, setTeams] = useState<Array<{ name: string; players: string[] }>>([]);
-  const [playersPerTeam, setPlayersPerTeam] = useState(5);
+  const [importResult, setImportResult] = useState<PlayerImportResult | null>(null);
+  const [teamResult, setTeamResult] = useState<TeamGenerationResult | null>(null);
+  const [teams, setTeams] = useState<EngineTeam[]>([]);
+  const [playersPerTeam, setPlayersPerTeam] = useState(
+    settings?.players_per_team || 5
+  );
+  const [seedingMode, setSeedingMode] = useState<SeedingMode>("imported");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const parsedPlayers = useMemo(() => parseUsernames(rawText), [rawText]);
-
-  const teamCount = useMemo(
-    () => Math.ceil(players.length / playersPerTeam) || 0,
-    [players, playersPerTeam]
-  );
-  const remainingPlayers = useMemo(
-    () => players.length % playersPerTeam || 0,
-    [players, playersPerTeam]
-  );
-
   function handleParsePlayers() {
-    if (parsedPlayers.length === 0) {
+    const result = parsePlayers(rawText);
+    if (result.totalImported === 0) {
       setError("No valid usernames found.");
       return;
     }
-    setPlayers(parsedPlayers);
-    setTeams(generateTeamGroups(parsedPlayers, playersPerTeam));
+    setImportResult(result);
+    const teamGen = generateTeams(result.players, playersPerTeam);
+    setTeamResult(teamGen);
+    setTeams(teamGen.teams);
     setError("");
     setStep(2);
   }
 
-  function handleRegenerateTeams() {
-    setTeams(generateTeamGroups(players, playersPerTeam));
+  function handlePlayersPerTeamChange(value: number) {
+    setPlayersPerTeam(value);
+    if (importResult) {
+      const teamGen = generateTeams(importResult.players, value);
+      setTeamResult(teamGen);
+      setTeams(teamGen.teams);
+    }
   }
 
   function updateTeamName(index: number, name: string) {
@@ -340,7 +127,9 @@ export default function TournamentGeneratorPage() {
     if (!cleaned) return;
     setTeams((prev) =>
       prev.map((t, i) =>
-        i === teamIdx ? { ...t, players: [...t.players, cleaned] } : t
+        i === teamIdx
+          ? { ...t, players: [...t.players, { username: cleaned, originalIndex: -1 }] }
+          : t
       )
     );
   }
@@ -353,8 +142,14 @@ export default function TournamentGeneratorPage() {
   ) {
     setTeams((prev) => {
       const newTeams = [...prev];
-      const teamA = { ...newTeams[teamAIdx], players: [...newTeams[teamAIdx].players] };
-      const teamB = { ...newTeams[teamBIdx], players: [...newTeams[teamBIdx].players] };
+      const teamA = {
+        ...newTeams[teamAIdx],
+        players: [...newTeams[teamAIdx].players],
+      };
+      const teamB = {
+        ...newTeams[teamBIdx],
+        players: [...newTeams[teamBIdx].players],
+      };
       const temp = teamA.players[playerAIdx];
       teamA.players[playerAIdx] = teamB.players[playerBIdx];
       teamB.players[playerBIdx] = temp;
@@ -365,7 +160,16 @@ export default function TournamentGeneratorPage() {
   }
 
   function createNewTeam() {
-    setTeams((prev) => [...prev, { name: `Team ${prev.length + 1}`, players: [] }]);
+    setTeams((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}`,
+        name: `Team ${prev.length + 1}`,
+        players: [],
+        seed: prev.length + 1,
+        logo: null,
+      },
+    ]);
   }
 
   function deleteTeam(index: number) {
@@ -375,7 +179,9 @@ export default function TournamentGeneratorPage() {
   function shuffleTeams() {
     const allPlayers = teams.flatMap((t) => t.players);
     const shuffled = [...allPlayers].sort(() => Math.random() - 0.5);
-    setTeams(generateTeamGroups(shuffled, playersPerTeam));
+    const teamGen = generateTeams(shuffled, playersPerTeam);
+    setTeams(teamGen.teams);
+    setTeamResult(teamGen);
   }
 
   async function handleSaveAndGenerate() {
@@ -384,58 +190,101 @@ export default function TournamentGeneratorPage() {
     setSuccess("");
 
     try {
+      const validation = validateTournament({
+        teams,
+        config: { playersPerTeam, bestOf: settings?.best_of || 3, seedingMode },
+      });
+      if (!validation.valid) {
+        setError(validation.errors.map((e) => e.message).join(" "));
+        return;
+      }
+
       const { data: et } = await supabase.from("teams").select("id");
       if (et && et.length > 0)
-        await supabase.from("teams").delete().in("id", et.map((r: { id: string }) => r.id));
+        await supabase
+          .from("teams")
+          .delete()
+          .in(
+            "id",
+            et.map((r: { id: string }) => r.id)
+          );
       const { data: eb } = await supabase.from("brackets").select("id");
       if (eb && eb.length > 0)
-        await supabase.from("brackets").delete().in("id", eb.map((r: { id: string }) => r.id));
+        await supabase
+          .from("brackets")
+          .delete()
+          .in(
+            "id",
+            eb.map((r: { id: string }) => r.id)
+          );
       const { data: em } = await supabase.from("matches").select("id");
       if (em && em.length > 0)
-        await supabase.from("matches").delete().in("id", em.map((r: { id: string }) => r.id));
+        await supabase
+          .from("matches")
+          .delete()
+          .in(
+            "id",
+            em.map((r: { id: string }) => r.id)
+          );
 
-      const teamRows = teams.map((t, i) => ({
-        team_name: t.name,
-        logo: null,
-        captain: t.players[0] || "",
-        player_1: t.players[0] || "",
-        player_2: t.players[1] || "",
-        player_3: t.players[2] || "",
-        player_4: t.players[3] || "",
-        player_5: t.players[4] || "",
-        substitute: t.players[5] || null,
-        seed: i + 1,
-      }));
-
+      const teamRows = teams.map((t) => mapTeamToDB(t));
       const { data: savedTeams, error: teamErr } = await supabase
         .from("teams")
         .insert(teamRows)
         .select();
-
       if (teamErr) throw teamErr;
       if (!savedTeams) throw new Error("Failed to save teams");
 
-      const tNames = savedTeams.map((t: Team) => t.team_name);
-      const tIds = savedTeams.map((t: Team) => t.id);
-      const { bracketSlots, matchRows } = buildBracket(tNames, tIds);
+      const idMap = new Map<string, string>();
+      for (const saved of savedTeams) {
+        const original = teams.find((t) => t.name === saved.team_name);
+        if (original) idMap.set(original.id, saved.id);
+      }
 
-      if (bracketSlots.length > 0) {
-        const { error: bErr } = await supabase.from("brackets").insert(
-          bracketSlots.map((b) => ({
-            round: b.round,
-            round_order: b.round_order,
-            position: b.position,
-            team_name: b.team_name,
-            team_seed: b.team_seed,
-            team_id: b.team_id,
-            is_bye: b.is_bye,
-            is_winner: b.is_winner,
-            is_current: b.is_current,
-          }))
+      const mappedTeams = teams.map((t) => ({
+        ...t,
+        id: idMap.get(t.id) || t.id,
+      }));
+
+      const bracket = generateBracket(
+        mappedTeams,
+        seedingMode,
+        settings?.best_of || 3
+      );
+
+      const bracketRows = bracket.slots.map((s) => mapBracketToDB(s));
+      if (bracketRows.length > 0) {
+        const bracketIds = bracketRows.map((r) => r.id as string);
+        const mappedBracketIds = bracketIds.map(
+          (bid) => idMap.get(bid) || bid
         );
+        const finalBracketRows = bracketRows.map((r, i) => ({
+          ...r,
+          id: mappedBracketIds[i],
+          team_id: r.team_id ? idMap.get(r.team_id as string) || r.team_id : null,
+          match_id: r.match_id
+            ? idMap.get(r.match_id as string) || r.match_id
+            : null,
+        }));
+        const { error: bErr } = await supabase
+          .from("brackets")
+          .insert(finalBracketRows);
         if (bErr) throw bErr;
       }
 
+      const matchRows = bracket.matches.map((m) => {
+        const mapped = mapMatchToDB(m);
+        return {
+          ...mapped,
+          id: idMap.get(mapped.id as string) || mapped.id,
+          team_a_id: mapped.team_a_id
+            ? idMap.get(mapped.team_a_id as string) || mapped.team_a_id
+            : null,
+          team_b_id: mapped.team_b_id
+            ? idMap.get(mapped.team_b_id as string) || mapped.team_b_id
+            : null,
+        };
+      });
       if (matchRows.length > 0) {
         const { error: mErr } = await supabase.from("matches").insert(matchRows);
         if (mErr) throw mErr;
@@ -443,9 +292,9 @@ export default function TournamentGeneratorPage() {
 
       await refetch();
       setSuccess(
-        `${savedTeams.length} teams and ${matchRows.length} matches generated!`
+        `${savedTeams.length} teams and ${bracket.matches.length} matches generated!`
       );
-      setStep(4);
+      setStep(5);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save tournament");
     } finally {
@@ -453,7 +302,9 @@ export default function TournamentGeneratorPage() {
     }
   }
 
-  const [swapA, setSwapA] = useState<{ team: number; player: number } | null>(null);
+  const [swapA, setSwapA] = useState<{ team: number; player: number } | null>(
+    null
+  );
 
   return (
     <div className="space-y-6">
@@ -470,7 +321,13 @@ export default function TournamentGeneratorPage() {
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {STEP_LABELS.map((s, i) => {
+        {[
+          { label: "Paste Players", icon: Users },
+          { label: "Preview Teams", icon: Sparkles },
+          { label: "Edit Teams", icon: Shuffle },
+          { label: "Configure", icon: Settings },
+          { label: "Save & Generate", icon: Download },
+        ].map((s, i) => {
           const Icon = s.icon;
           const isActive = step === i + 1;
           const isDone = step > i + 1;
@@ -493,7 +350,7 @@ export default function TournamentGeneratorPage() {
                 )}
                 {s.label}
               </div>
-              {i < STEP_LABELS.length - 1 && (
+              {i < 4 && (
                 <ArrowRight className="h-3 w-3 text-zinc-600 flex-shrink-0" />
               )}
             </div>
@@ -537,20 +394,28 @@ export default function TournamentGeneratorPage() {
                   Paste Player Usernames
                 </h3>
                 <p className="text-xs text-zinc-500">
-                  One per line. @ prefix auto-removed. Duplicates removed.
+                  One per line. @ prefix auto-removed. Duplicates preserved with
+                  warning.
                 </p>
               </div>
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
-                placeholder={"@adicostyles\n@andyshicool\n@dfxyz69\n@dreanxv\n@jfxxx13"}
+                placeholder={
+                  "@adicostyles\n@andyshicool\n@dfxyz69\n@dreanxv\n@jfxxx13"
+                }
                 className="w-full h-64 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-orange-500/30 resize-none font-mono"
               />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">
-                  {parsedPlayers.length} player{parsedPlayers.length !== 1 ? "s" : ""} detected
+                  {importResult
+                    ? `${importResult.totalImported} players detected`
+                    : "0 players detected"}
                 </span>
-                <Button onClick={handleParsePlayers} disabled={parsedPlayers.length === 0}>
+                <Button
+                  onClick={handleParsePlayers}
+                  disabled={rawText.trim().length === 0}
+                >
                   <ArrowRight className="h-4 w-4" />
                   Next: Preview Teams
                 </Button>
@@ -559,7 +424,7 @@ export default function TournamentGeneratorPage() {
           </motion.div>
         )}
 
-        {step === 2 && (
+        {step === 2 && importResult && teamResult && (
           <motion.div
             key="step2"
             initial={{ opacity: 0, x: 20 }}
@@ -568,51 +433,98 @@ export default function TournamentGeneratorPage() {
           >
             <Card className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Import Preview</h3>
+                <h3 className="text-sm font-semibold text-white">
+                  Import Preview
+                </h3>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-500">Players per team:</span>
+                    <span className="text-xs text-zinc-500">
+                      Players per team:
+                    </span>
                     <Select
                       value={String(playersPerTeam)}
-                      onChange={(e) => {
-                        setPlayersPerTeam(parseInt(e.target.value));
-                        setTeams(generateTeamGroups(players, parseInt(e.target.value)));
-                      }}
+                      onChange={(e) =>
+                        handlePlayersPerTeamChange(parseInt(e.target.value))
+                      }
                       className="h-8 w-20 text-xs"
                     >
-                      {[3, 4, 5, 6].map((n) => (
+                      {[5, 6, 7].map((n) => (
                         <option key={n} value={n}>
                           {n}
                         </option>
                       ))}
                     </Select>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleRegenerateTeams}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allPlayers = teams.flatMap((t) => t.players);
+                      const shuffled = [...allPlayers].sort(
+                        () => Math.random() - 0.5
+                      );
+                      const tg = generateTeams(shuffled, playersPerTeam);
+                      setTeams(tg.teams);
+                      setTeamResult(tg);
+                    }}
+                  >
                     <Shuffle className="h-3.5 w-3.5" />
                     Regenerate
                   </Button>
                 </div>
               </div>
 
+              {importResult.duplicates.length > 0 && (
+                <div className="flex items-start gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="text-yellow-400 font-medium">
+                      Duplicate usernames detected:
+                    </p>
+                    <p className="text-yellow-400/70 mt-1">
+                      {importResult.duplicates
+                        .map((d) => `"${d.username}" (${d.count}x)`)
+                        .join(", ")}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 text-center">
-                  <p className="text-2xl font-bold text-white">{players.length}</p>
-                  <p className="text-xs text-zinc-500">Total Players</p>
+                  <p className="text-2xl font-bold text-white">
+                    {importResult.totalImported}
+                  </p>
+                  <p className="text-xs text-zinc-500">Imported Players</p>
                 </div>
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 text-center">
-                  <p className="text-2xl font-bold text-orange-400">{teams.length}</p>
-                  <p className="text-xs text-zinc-500">Teams</p>
+                  <p className="text-2xl font-bold text-orange-400">
+                    {teamResult.teamCount}
+                  </p>
+                  <p className="text-xs text-zinc-500">Generated Teams</p>
                 </div>
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 text-center">
-                  <p className="text-2xl font-bold text-zinc-400">{remainingPlayers}</p>
+                  <p className="text-2xl font-bold text-zinc-400">
+                    {teamResult.remainingCount}
+                  </p>
                   <p className="text-xs text-zinc-500">Remaining</p>
                 </div>
               </div>
 
+              {teamResult.remainingCount > 0 && (
+                <div className="flex items-start gap-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-4 py-3">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-yellow-400">
+                    {teamResult.remainingCount} player(s) are not assigned. They
+                    will be excluded from the tournament.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1">
                 {teams.map((team, i) => (
                   <div
-                    key={i}
+                    key={team.id}
                     className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
                   >
                     <p className="text-xs font-semibold text-orange-400 mb-2">
@@ -621,7 +533,7 @@ export default function TournamentGeneratorPage() {
                     <div className="space-y-1">
                       {team.players.map((p, j) => (
                         <p key={j} className="text-xs text-zinc-400 truncate">
-                          {j + 1}. {p}
+                          {j + 1}. {p.username}
                         </p>
                       ))}
                     </div>
@@ -654,7 +566,19 @@ export default function TournamentGeneratorPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">Team Editor</h3>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={shuffleTeams}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allPlayers = teams.flatMap((t) => t.players);
+                      const shuffled = [...allPlayers].sort(
+                        () => Math.random() - 0.5
+                      );
+                      const tg = generateTeams(shuffled, playersPerTeam);
+                      setTeams(tg.teams);
+                      setTeamResult(tg);
+                    }}
+                  >
                     <Shuffle className="h-3.5 w-3.5" />
                     Shuffle All
                   </Button>
@@ -672,9 +596,13 @@ export default function TournamentGeneratorPage() {
                   className="rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-xs text-orange-400 flex items-center justify-between"
                 >
                   <span>
-                    Selected: {teams[swapA.team]?.name} → {teams[swapA.team]?.players[swapA.player]}
+                    Selected: {teams[swapA.team]?.name} →{" "}
+                    {teams[swapA.team]?.players[swapA.player]?.username}
                   </span>
-                  <button onClick={() => setSwapA(null)} className="text-orange-400 hover:text-white">
+                  <button
+                    onClick={() => setSwapA(null)}
+                    className="text-orange-400 hover:text-white"
+                  >
                     Cancel
                   </button>
                 </motion.div>
@@ -683,7 +611,7 @@ export default function TournamentGeneratorPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1">
                 {teams.map((team, ti) => (
                   <div
-                    key={ti}
+                    key={team.id}
                     className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-2"
                   >
                     <div className="flex items-center justify-between">
@@ -703,7 +631,9 @@ export default function TournamentGeneratorPage() {
                     <div className="space-y-1">
                       {team.players.map((p, pi) => (
                         <div key={pi} className="flex items-center gap-1">
-                          <span className="text-[10px] text-zinc-600 w-4">{pi + 1}</span>
+                          <span className="text-[10px] text-zinc-600 w-4">
+                            {pi + 1}
+                          </span>
                           <span
                             className={cn(
                               "flex-1 text-xs truncate cursor-pointer",
@@ -713,14 +643,19 @@ export default function TournamentGeneratorPage() {
                             )}
                             onClick={() => {
                               if (swapA) {
-                                swapPlayersBetweenTeams(swapA.team, swapA.player, ti, pi);
+                                swapPlayersBetweenTeams(
+                                  swapA.team,
+                                  swapA.player,
+                                  ti,
+                                  pi
+                                );
                                 setSwapA(null);
                               } else {
                                 setSwapA({ team: ti, player: pi });
                               }
                             }}
                           >
-                            {p}
+                            {p.username}
                           </span>
                           <button
                             onClick={() => movePlayer(ti, pi, -1)}
@@ -764,7 +699,7 @@ export default function TournamentGeneratorPage() {
                 </Button>
                 <Button onClick={() => setStep(4)}>
                   <ArrowRight className="h-4 w-4" />
-                  Next: Generate
+                  Next: Configure
                 </Button>
               </div>
             </Card>
@@ -779,15 +714,58 @@ export default function TournamentGeneratorPage() {
             exit={{ opacity: 0, x: -20 }}
           >
             <Card className="p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-white">Generate Tournament</h3>
-              <p className="text-xs text-zinc-400">
-                This will:
-              </p>
+              <h3 className="text-sm font-semibold text-white">
+                Tournament Configuration
+              </h3>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <span className="text-xs text-zinc-400">Seeding Mode</span>
+                  <div className="flex items-center gap-2">
+                    {SEEDING_OPTIONS.map((opt) => {
+                      const Icon = opt.icon;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => setSeedingMode(opt.value)}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                            seedingMode === opt.value
+                              ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                              : "bg-white/[0.04] text-zinc-500 border border-white/[0.06] hover:text-zinc-300"
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <span className="text-xs text-zinc-400">Best Of</span>
+                  <span className="text-sm font-bold text-white">
+                    BO{settings?.best_of || 3}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <span className="text-xs text-zinc-400">Bracket Size</span>
+                  <span className="text-sm font-bold text-white">
+                    {determineBracketSize(teams.length)} teams
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-500">This will:</p>
               <ul className="text-xs text-zinc-500 space-y-1 ml-4 list-disc">
                 <li>Delete all existing teams, brackets, and matches</li>
                 <li>Save {teams.length} teams with their players</li>
-                <li>Generate a {getBracketSize(teams.length)}-team single elimination bracket</li>
-                <li>Create {buildBracket(teams.map((t) => t.name), teams.map((_, i) => String(i))).matchRows.length} matches</li>
+                <li>
+                  Generate a {determineBracketSize(teams.length)}-team single
+                  elimination bracket
+                </li>
               </ul>
 
               <div className="flex items-center justify-between pt-2">
@@ -808,9 +786,9 @@ export default function TournamentGeneratorPage() {
           </motion.div>
         )}
 
-        {step === 4 && success && (
+        {step === 5 && success && (
           <motion.div
-            key="step4-done"
+            key="step5-done"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
@@ -818,10 +796,21 @@ export default function TournamentGeneratorPage() {
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/20 border border-green-500/20">
                 <Check className="h-8 w-8 text-green-400" />
               </div>
-              <h3 className="text-xl font-bold text-white">Tournament Generated!</h3>
+              <h3 className="text-xl font-bold text-white">
+                Tournament Generated!
+              </h3>
               <p className="text-sm text-zinc-400">{success}</p>
               <div className="flex items-center justify-center gap-3 pt-4">
-                <Button onClick={() => { setStep(1); setRawText(""); setPlayers([]); setTeams([]); setSuccess(""); }}>
+                <Button
+                  onClick={() => {
+                    setStep(1);
+                    setRawText("");
+                    setImportResult(null);
+                    setTeamResult(null);
+                    setTeams([]);
+                    setSuccess("");
+                  }}
+                >
                   Create Another
                 </Button>
                 <a href="/bracket" target="_blank">
@@ -836,5 +825,25 @@ export default function TournamentGeneratorPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function Settings(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   );
 }

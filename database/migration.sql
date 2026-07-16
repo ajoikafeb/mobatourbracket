@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS players (
 
 -- Add new columns to teams table
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS seed INTEGER DEFAULT 0;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS player_6 TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_teams_seed ON teams(seed);
 
 -- Add new columns to settings table
