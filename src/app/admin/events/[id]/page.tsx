@@ -20,6 +20,7 @@ import {
   Globe,
   Star,
   RefreshCw,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -299,6 +300,15 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <Link href={`/admin/events/${eventId}/form`}>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  Form Builder
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 onClick={handleSave}

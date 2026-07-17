@@ -18,6 +18,7 @@ import {
   CalendarRange,
   Hash,
   ArrowLeft,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -114,8 +115,13 @@ function EventCard({
 
             <div className="flex flex-col gap-1.5 flex-shrink-0">
               <Link href={`/admin/events/${event.id}`}>
-                <Button variant="outline" size="icon" className="h-8 w-8">
+                <Button variant="outline" size="icon" className="h-8 w-8" title="Edit Event">
                   <Edit className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+              <Link href={`/admin/events/${event.id}/form`}>
+                <Button variant="outline" size="icon" className="h-8 w-8" title="Form Builder">
+                  <ClipboardList className="h-3.5 w-3.5" />
                 </Button>
               </Link>
               <Button
