@@ -76,6 +76,12 @@ export async function updateRegistrationStatus(id: string, status: "approved" | 
   if (error) throw error;
 }
 
+export async function bulkUpdateRegistrationStatus(ids: string[], status: "approved" | "rejected"): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("registration_responses").update({ status, reviewed_at: new Date().toISOString() }).in("id", ids);
+  if (error) throw error;
+}
+
 export function exportRegistrationsCSV(registrations: RegistrationResponse[], fields: RegistrationField[]): string {
   const headers = ["Name", "Email", "Status", "Submitted At", ...fields.map((f) => f.label)];
   const rows = registrations.map((r) => {

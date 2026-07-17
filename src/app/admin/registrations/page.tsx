@@ -4,12 +4,10 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
-  Filter,
   Check,
   X,
   Download,
   Users,
-  Eye,
   ChevronDown,
   ChevronUp,
   Mail,
@@ -19,6 +17,8 @@ import {
   UserX,
   AlertCircle,
   Loader2,
+  ClipboardCopy,
+  CheckCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   getAllRegistrations,
   getRegistrationsByEvent,
-  updateRegistrationStatus,
+  bulkUpdateRegistrationStatus,
   exportRegistrationsCSV,
 } from "@/services/registration-service";
 import { getEvents } from "@/services/event-service";
@@ -122,14 +122,14 @@ function StatsCard({
 function RegistrationCard({
   registration,
   eventName,
-  onApprove,
-  onReject,
+  selected,
+  onToggle,
   updatingId,
 }: {
   registration: RegistrationResponse;
   eventName: string;
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
+  selected: boolean;
+  onToggle: () => void;
   updatingId: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -148,79 +148,75 @@ function RegistrationCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="bg-white/[0.035] border-white/[0.06] rounded-[20px] overflow-hidden hover:border-white/[0.1] transition-all duration-300">
+      <Card
+        className={cn(
+          "bg-white/[0.035] border-white/[0.06] rounded-[20px] overflow-hidden transition-all duration-200",
+          selected
+            ? "border-orange-500/40 bg-orange-500/[0.04]"
+            : "hover:border-white/[0.1]"
+        )}
+      >
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium tracking-wide",
-                    statusConfig.color
-                  )}
-                >
-                  <StatusIcon className="h-3 w-3" />
-                  {statusConfig.label}
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              {/* Checkbox */}
+              <button
+                onClick={onToggle}
+                className={cn(
+                  "mt-0.5 h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200",
+                  selected
+                    ? "border-orange-500 bg-orange-500"
+                    : "border-zinc-600 hover:border-zinc-400"
+                )}
+              >
+                {selected && (
+                  <Check className="h-3 w-3 text-white" />
+                )}
+              </button>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium tracking-wide",
+                      statusConfig.color
+                    )}
+                  >
+                    <StatusIcon className="h-3 w-3" />
+                    {statusConfig.label}
+                  </div>
+                  <span className="inline-flex items-center rounded-full border border-white/[0.06] bg-white/[0.04] px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
+                    {eventName}
+                  </span>
                 </div>
-                <span className="inline-flex items-center rounded-full border border-white/[0.06] bg-white/[0.04] px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
-                  {eventName}
-                </span>
+
+                <h3 className="text-base font-semibold text-white truncate">
+                  {registration.respondent_name}
+                </h3>
+
+                <div className="flex items-center gap-4 mt-1.5 text-xs text-zinc-400">
+                  <span className="flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-zinc-500" />
+                    {registration.respondent_email}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                    {formatDate(registration.submitted_at)}
+                  </span>
+                </div>
+
+                {dataEntries.length > 0 && !expanded && (
+                  <p className="text-xs text-zinc-500 mt-2 line-clamp-1">
+                    {dataEntries
+                      .slice(0, 3)
+                      .map(([k, v]) => `${k}: ${String(v)}`)
+                      .join(" • ")}
+                  </p>
+                )}
               </div>
-
-              <h3 className="text-base font-semibold text-white truncate">
-                {registration.respondent_name}
-              </h3>
-
-              <div className="flex items-center gap-4 mt-1.5 text-xs text-zinc-400">
-                <span className="flex items-center gap-1">
-                  <Mail className="h-3.5 w-3.5 text-zinc-500" />
-                  {registration.respondent_email}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                  {formatDate(registration.submitted_at)}
-                </span>
-              </div>
-
-              {dataEntries.length > 0 && !expanded && (
-                <p className="text-xs text-zinc-500 mt-2 line-clamp-1">
-                  {dataEntries
-                    .slice(0, 3)
-                    .map(([k, v]) => `${k}: ${String(v)}`)
-                    .join(" • ")}
-                </p>
-              )}
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              {registration.status === "pending" && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-green-500/25 text-green-400 hover:bg-green-500/15 hover:border-green-500/35"
-                    onClick={() => onApprove(registration.id)}
-                    disabled={isUpdating}
-                    title="Approve"
-                  >
-                    {isUpdating ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Check className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-red-500/25 text-red-400 hover:bg-red-500/15 hover:border-red-500/35"
-                    onClick={() => onReject(registration.id)}
-                    disabled={isUpdating}
-                    title="Reject"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </>
-              )}
               <Button
                 variant="outline"
                 size="icon"
@@ -304,7 +300,8 @@ function LoadingSkeleton() {
       {[1, 2, 3, 4].map((i) => (
         <Card key={i} className="bg-white/[0.035] border-white/[0.06] rounded-[20px]">
           <CardContent className="p-5">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <Skeleton className="h-5 w-5 rounded-md shrink-0" />
               <div className="flex-1 space-y-3">
                 <div className="flex gap-2">
                   <Skeleton className="h-5 w-20 rounded-full" />
@@ -315,12 +312,6 @@ function LoadingSkeleton() {
                   <Skeleton className="h-4 w-48" />
                   <Skeleton className="h-4 w-24" />
                 </div>
-                <Skeleton className="h-3 w-64" />
-              </div>
-              <div className="flex gap-1.5">
-                <Skeleton className="h-8 w-8 rounded-xl" />
-                <Skeleton className="h-8 w-8 rounded-xl" />
-                <Skeleton className="h-8 w-8 rounded-xl" />
               </div>
             </div>
           </CardContent>
@@ -339,6 +330,9 @@ export default function AdminRegistrationsPage() {
   const [statusFilter, setStatusFilter] = useState<"" | RegistrationResponseStatus>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const eventMap = useMemo(() => {
     const map = new Map<string, Event>();
@@ -394,40 +388,105 @@ export default function AdminRegistrationsPage() {
     return result;
   }, [registrations, eventFilter, statusFilter, search]);
 
-  async function handleApprove(id: string) {
-    setUpdatingId(id);
+  const filteredIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+  const selectedFiltered = useMemo(
+    () => selectedIds.size > 0 && filteredIds.some((id) => selectedIds.has(id)),
+    [selectedIds, filteredIds]
+  );
+  const allFilteredSelected = useMemo(
+    () => filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id)),
+    [selectedIds, filteredIds]
+  );
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  async function handleBulkApprove() {
+    const ids = [...selectedIds].filter((id) => {
+      const reg = registrations.find((r) => r.id === id);
+      return reg?.status === "pending";
+    });
+    if (ids.length === 0) return;
+    setBulkLoading(true);
     try {
-      await updateRegistrationStatus(id, "approved");
+      await bulkUpdateRegistrationStatus(ids, "approved");
       setRegistrations((prev) =>
         prev.map((r) =>
-          r.id === id
+          ids.includes(r.id)
             ? { ...r, status: "approved" as const, reviewed_at: new Date().toISOString() }
             : r
         )
       );
+      setSelectedIds(new Set());
     } catch {
       // handled silently
     } finally {
-      setUpdatingId(null);
+      setBulkLoading(false);
     }
   }
 
-  async function handleReject(id: string) {
-    setUpdatingId(id);
+  async function handleBulkReject() {
+    const ids = [...selectedIds].filter((id) => {
+      const reg = registrations.find((r) => r.id === id);
+      return reg?.status === "pending";
+    });
+    if (ids.length === 0) return;
+    setBulkLoading(true);
     try {
-      await updateRegistrationStatus(id, "rejected");
+      await bulkUpdateRegistrationStatus(ids, "rejected");
       setRegistrations((prev) =>
         prev.map((r) =>
-          r.id === id
+          ids.includes(r.id)
             ? { ...r, status: "rejected" as const, reviewed_at: new Date().toISOString() }
             : r
         )
       );
+      setSelectedIds(new Set());
     } catch {
       // handled silently
     } finally {
-      setUpdatingId(null);
+      setBulkLoading(false);
     }
+  }
+
+  function handleCopyList() {
+    const approved = registrations.filter((r) => r.status === "approved");
+    const lines = approved.map((r, i) => {
+      const parts = [`${i + 1}. ${r.respondent_name}`];
+      if (r.respondent_email) parts.push(r.respondent_email);
+      const dataVals = Object.entries(r.data)
+        .filter(([k, v]) => v && String(v).trim() && k !== "Full Name" && k !== "Email")
+        .map(([k, v]) => `${k}: ${v}`);
+      if (dataVals.length > 0) parts.push(dataVals.join(" | "));
+      return parts.join(" - ");
+    });
+    const text = lines.join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
   }
 
   function handleExport() {
@@ -436,6 +495,14 @@ export default function AdminRegistrationsPage() {
     setExportSuccess(true);
     setTimeout(() => setExportSuccess(false), 2000);
   }
+
+  const selectedCount = selectedIds.size;
+  const selectedPendingCount = useMemo(() => {
+    return [...selectedIds].filter((id) => {
+      const reg = registrations.find((r) => r.id === id);
+      return reg?.status === "pending";
+    }).length;
+  }, [selectedIds, registrations]);
 
   return (
     <div className="min-h-screen bg-[#09090B] p-6 space-y-6">
@@ -459,23 +526,42 @@ export default function AdminRegistrationsPage() {
             Review and manage all event registrations across your platform.
           </p>
         </div>
-        <Button
-          onClick={handleExport}
-          className={cn(
-            "gap-2 transition-all",
-            exportSuccess
-              ? "bg-green-500/20 text-green-400 border border-green-500/30"
-              : "bg-[#FF7A00] hover:bg-[#FF7A00]/90 text-white shadow-[0_2px_12px_rgba(255,122,0,0.3)]"
-          )}
-          disabled={filtered.length === 0}
-        >
-          {exportSuccess ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {exportSuccess ? "Exported!" : "Export CSV"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleCopyList}
+            variant="outline"
+            className={cn(
+              "gap-2 transition-all",
+              copySuccess
+                ? "border-green-500/30 text-green-400 bg-green-500/10"
+                : "border-white/[0.08] text-zinc-300 hover:text-white hover:border-white/[0.15]"
+            )}
+          >
+            {copySuccess ? (
+              <CheckCheck className="h-4 w-4" />
+            ) : (
+              <ClipboardCopy className="h-4 w-4" />
+            )}
+            {copySuccess ? "Copied!" : "Copy List"}
+          </Button>
+          <Button
+            onClick={handleExport}
+            className={cn(
+              "gap-2 transition-all",
+              exportSuccess
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-[#FF7A00] hover:bg-[#FF7A00]/90 text-white shadow-[0_2px_12px_rgba(255,122,0,0.3)]"
+            )}
+            disabled={filtered.length === 0}
+          >
+            {exportSuccess ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exportSuccess ? "Exported!" : "Export CSV"}
+          </Button>
+        </div>
       </motion.div>
 
       {/* Stats */}
@@ -555,16 +641,97 @@ export default function AdminRegistrationsPage() {
         </div>
       </motion.div>
 
-      {/* Results count */}
+      {/* Bulk Actions Bar */}
+      <AnimatePresence>
+        {selectedCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-orange-500/20 bg-orange-500/[0.06] px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-orange-300 font-medium">
+                  {selectedCount} selected
+                </span>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-xs text-zinc-400 hover:text-white transition-colors underline underline-offset-2"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedPendingCount > 0 && (
+                  <>
+                    <Button
+                      onClick={handleBulkApprove}
+                      disabled={bulkLoading}
+                      size="sm"
+                      className="gap-1.5 bg-green-500/15 text-green-400 border border-green-500/25 hover:bg-green-500/25 hover:border-green-500/40"
+                    >
+                      {bulkLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                      Approve ({selectedPendingCount})
+                    </Button>
+                    <Button
+                      onClick={handleBulkReject}
+                      disabled={bulkLoading}
+                      size="sm"
+                      className="gap-1.5 bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 hover:border-red-500/40"
+                    >
+                      {bulkLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <X className="h-3.5 w-3.5" />
+                      )}
+                      Reject ({selectedPendingCount})
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Results count + Select All */}
       {!loading && (
-        <motion.p
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-xs text-zinc-500"
+          className="flex items-center justify-between"
         >
-          {filtered.length} registration{filtered.length !== 1 ? "s" : ""}
-          {(eventFilter || statusFilter || search) && " found"}
-        </motion.p>
+          <p className="text-xs text-zinc-500">
+            {filtered.length} registration{filtered.length !== 1 ? "s" : ""}
+            {(eventFilter || statusFilter || search) && " found"}
+          </p>
+          {filtered.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-xs text-zinc-500 hover:text-orange-400 transition-colors"
+            >
+              <span
+                className={cn(
+                  "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-all",
+                  allFilteredSelected
+                    ? "border-orange-500 bg-orange-500"
+                    : "border-zinc-600"
+                )}
+              >
+                {allFilteredSelected && (
+                  <Check className="h-2.5 w-2.5 text-white" />
+                )}
+              </span>
+              {allFilteredSelected ? "Deselect all" : "Select all"}
+            </button>
+          )}
+        </motion.div>
       )}
 
       {/* Registration list */}
@@ -578,8 +745,8 @@ export default function AdminRegistrationsPage() {
                 key={reg.id}
                 registration={reg}
                 eventName={eventMap.get(reg.event_id)?.title ?? "Unknown Event"}
-                onApprove={handleApprove}
-                onReject={handleReject}
+                selected={selectedIds.has(reg.id)}
+                onToggle={() => toggleSelect(reg.id)}
                 updatingId={updatingId}
               />
             ))}
