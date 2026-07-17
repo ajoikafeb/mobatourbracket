@@ -2,7 +2,20 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Settings, Save, Loader2, Globe, Clock, Users, Trophy, FileText, Palette } from "lucide-react";
+import {
+  Settings,
+  Save,
+  Loader2,
+  Globe,
+  Clock,
+  Users,
+  Trophy,
+  FileText,
+  Palette,
+  Info,
+  Share2,
+  Link as LinkIcon,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +56,15 @@ export default function AdminSettingsPage() {
   const [message, setMessage] = useState("");
   const [initialized, setInitialized] = useState(false);
 
+  const [communityName, setCommunityName] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("#FF7A00");
+  const [secondaryColor, setSecondaryColor] = useState("#FFA726");
+  const [heroBanner, setHeroBanner] = useState("");
+  const [discordUrl, setDiscordUrl] = useState("");
+  const [kickUrl, setKickUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+
   useEffect(() => {
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
   }, []);
@@ -62,6 +84,14 @@ export default function AdminSettingsPage() {
       setBreakDuration(String(settings.break_duration_minutes ?? 10));
       setBestOf(String(settings.best_of ?? 3));
       setPlayersPerTeam(String(settings.players_per_team ?? 5));
+      setCommunityName(settings.community_name || "");
+      setPrimaryColor(settings.primary_color || "#FF7A00");
+      setSecondaryColor(settings.secondary_color || "#FFA726");
+      setHeroBanner(settings.hero_banner || "");
+      setDiscordUrl(settings.discord_url || "");
+      setKickUrl(settings.kick_url || "");
+      setInstagramUrl(settings.instagram_url || "");
+      setWebsiteUrl(settings.website_url || "");
       setInitialized(true);
     }
   }, [settings, initialized]);
@@ -84,6 +114,14 @@ export default function AdminSettingsPage() {
         best_of: Number(bestOf),
         players_per_team: Number(playersPerTeam),
         timezone,
+        community_name: communityName || null,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        hero_banner: heroBanner || null,
+        discord_url: discordUrl || null,
+        kick_url: kickUrl || null,
+        instagram_url: instagramUrl || null,
+        website_url: websiteUrl || null,
       };
 
       if (settings?.id) {
@@ -324,6 +362,222 @@ export default function AdminSettingsPage() {
               Timezone is auto-detected from your browser settings and saved
               with the configuration.
             </p>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* ── Community Info ──────────────────────────────────────────── */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/20">
+              <Info className="h-4 w-4 text-cyan-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">
+              Community Info
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Community Name
+              </label>
+              <Input
+                placeholder="e.g. Neosoul Gaming"
+                value={communityName}
+                onChange={(e) => setCommunityName(e.target.value)}
+              />
+              <p className="text-xs text-zinc-500 mt-1.5">
+                Display name for your community across the platform.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Version
+              </label>
+              <div className="relative">
+                <Input
+                  value="v0.0.2"
+                  readOnly
+                  className="text-zinc-400"
+                />
+              </div>
+              <p className="text-xs text-zinc-500 mt-1.5">
+                Current platform version (read-only).
+              </p>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* ── Branding ──────────────────────────────────────────────── */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/20">
+              <Palette className="h-4 w-4 text-orange-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">
+              Branding
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Primary Color
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="h-10 w-10 shrink-0 rounded-lg border border-white/[0.08] bg-transparent cursor-pointer"
+                />
+                <Input
+                  placeholder="#FF7A00"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-zinc-500 mt-1.5">
+                Main accent color used across the platform.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Secondary Color
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={secondaryColor}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                  className="h-10 w-10 shrink-0 rounded-lg border border-white/[0.08] bg-transparent cursor-pointer"
+                />
+                <Input
+                  placeholder="#FFA726"
+                  value={secondaryColor}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-zinc-500 mt-1.5">
+                Secondary accent color for gradients and highlights.
+              </p>
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Hero Banner URL
+              </label>
+              <div className="relative">
+                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Input
+                  placeholder="https://example.com/banner.png"
+                  value={heroBanner}
+                  onChange={(e) => setHeroBanner(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <p className="text-xs text-zinc-500 mt-1.5">
+                URL for the homepage hero background image.
+              </p>
+            </div>
+          </div>
+
+          {heroBanner && (
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="text-xs text-zinc-500 mb-3">Banner Preview</p>
+              <div className="relative aspect-[3/1] overflow-hidden rounded-lg bg-zinc-900">
+                <img
+                  src={heroBanner}
+                  alt="Hero banner preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </Card>
+      </motion.div>
+
+      {/* ── Social Links ──────────────────────────────────────────── */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-500/20">
+              <Share2 className="h-4 w-4 text-pink-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">
+              Social Links
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Discord URL
+              </label>
+              <div className="relative">
+                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Input
+                  placeholder="https://discord.gg/your-server"
+                  value={discordUrl}
+                  onChange={(e) => setDiscordUrl(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Kick URL
+              </label>
+              <div className="relative">
+                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Input
+                  placeholder="https://kick.com/your-channel"
+                  value={kickUrl}
+                  onChange={(e) => setKickUrl(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Instagram URL
+              </label>
+              <div className="relative">
+                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Input
+                  placeholder="https://instagram.com/your-page"
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">
+                Website URL
+              </label>
+              <div className="relative">
+                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Input
+                  placeholder="https://your-website.com"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
           </div>
         </Card>
       </motion.div>

@@ -85,9 +85,167 @@ export interface Settings {
   best_of: number;
   players_per_team: number;
   footer_text: string;
+  community_name?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  hero_banner?: string | null;
+  discord_url?: string;
+  kick_url?: string;
+  instagram_url?: string;
+  website_url?: string;
+  version?: string;
   created_at: string;
   updated_at: string;
 }
+
+// ── v0.0.2: Event Platform Types ────────────────────────
+
+export type EventCategory =
+  | "tournament"
+  | "giveaway"
+  | "community_night"
+  | "poker"
+  | "quiz"
+  | "watch_party"
+  | "workshop"
+  | "custom";
+
+export type EventStatus =
+  | "draft"
+  | "registration_open"
+  | "registration_closed"
+  | "upcoming"
+  | "running"
+  | "completed"
+  | "cancelled";
+
+export type RegistrationStatus = "open" | "closed" | "invite_only";
+
+export interface EventCategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  color: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  slug: string;
+  banner: string | null;
+  thumbnail: string | null;
+  description: string;
+  category: EventCategory;
+  status: EventStatus;
+  registration_status: RegistrationStatus;
+  start_date: string | null;
+  end_date: string | null;
+  location: string;
+  max_participants: number;
+  current_participants: number;
+  featured: boolean;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FieldType =
+  | "text"
+  | "long_text"
+  | "email"
+  | "phone"
+  | "number"
+  | "dropdown"
+  | "radio"
+  | "checkbox"
+  | "textarea"
+  | "date"
+  | "upload"
+  | "discord"
+  | "telegram"
+  | "kick_username"
+  | "ml_id"
+  | "server_id"
+  | "custom";
+
+export interface RegistrationForm {
+  id: string;
+  event_id: string;
+  title: string;
+  description: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegistrationField {
+  id: string;
+  form_id: string;
+  field_type: FieldType;
+  label: string;
+  placeholder: string;
+  required: boolean;
+  options: string[];
+  validation: Record<string, unknown>;
+  sort_order: number;
+  created_at: string;
+}
+
+export type RegistrationResponseStatus = "pending" | "approved" | "rejected";
+
+export interface RegistrationResponse {
+  id: string;
+  event_id: string;
+  form_id: string;
+  respondent_name: string;
+  respondent_email: string;
+  data: Record<string, unknown>;
+  status: RegistrationResponseStatus;
+  notes: string;
+  submitted_at: string;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export type AnnouncementType = "info" | "warning" | "success" | "event" | "update";
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: AnnouncementType;
+  pinned: boolean;
+  published: boolean;
+  event_id: string | null;
+  published_at: string;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const EVENT_CATEGORY_MAP: Record<EventCategory, string> = {
+  tournament: "Tournament",
+  giveaway: "Giveaway",
+  community_night: "Community Night",
+  poker: "Poker",
+  quiz: "Quiz",
+  watch_party: "Watch Party",
+  workshop: "Workshop",
+  custom: "Custom Event",
+};
+
+export const EVENT_STATUS_MAP: Record<EventStatus, { label: string; color: string }> = {
+  draft: { label: "Draft", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30" },
+  registration_open: { label: "Registration Open", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+  registration_closed: { label: "Registration Closed", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+  upcoming: { label: "Upcoming", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  running: { label: "Running", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+  completed: { label: "Completed", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+  cancelled: { label: "Cancelled", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30" },
+};
 
 export type RoundName =
   | "Grand Final"

@@ -15,6 +15,9 @@ import {
   ChevronRight,
   Clock,
   Star,
+  CalendarDays,
+  Flame,
+  ChevronDown,
 } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
@@ -23,9 +26,13 @@ import { PageWrapper } from "@/components/shared/page-wrapper";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { AnnouncementBar } from "@/components/public/announcement-bar";
+import { EventCard } from "@/components/public/event-card";
 import { useTournament } from "@/hooks/use-tournament";
+import { useAnnouncements } from "@/hooks/use-announcements";
+import { useFeaturedEvents, useEventsByStatus } from "@/hooks/use-events";
 import { ROUND_CONFIG } from "@/lib/types";
-import type { RoundName } from "@/lib/types";
+import type { RoundName, Event } from "@/lib/types";
 import { cn, formatDate, formatTime } from "@/lib/utils";
 
 const fadeUp: Variants = {
@@ -72,6 +79,11 @@ const ROUND_NAME_MAP: Record<string, string> = {
 
 export default function HomePage() {
   const { currentMatch, matches, teams, settings, loading, bracket } = useTournament();
+  const { announcements } = useAnnouncements(true);
+  const { events: featuredEvents } = useFeaturedEvents();
+  const { events: runningEvents } = useEventsByStatus("running");
+  const { events: upcomingEvents } = useEventsByStatus("upcoming");
+  const { events: regOpenEvents } = useEventsByStatus("registration_open");
 
   const nextMatch = !currentMatch
     ? matches
@@ -82,6 +94,10 @@ export default function HomePage() {
   const totalMatches = matches.length;
   const tournamentStatus = settings?.tournament_status ?? "upcoming";
   const mappedStatus = STATUS_MAP[tournamentStatus] ?? "waiting";
+
+  const allUpcomingEvents: Event[] = [...upcomingEvents, ...regOpenEvents].filter(
+    (event, index, self) => index === self.findIndex((e) => e.id === event.id)
+  );
 
   return (
     <div className="min-h-screen bg-[#09090B]">
@@ -101,6 +117,14 @@ export default function HomePage() {
               </div>
             </div>
           ) : (<>
+
+          {/* ── Announcement Bar ──────────────────────────────────────── */}
+          {announcements.length > 0 && (
+            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8">
+              <AnnouncementBar announcements={announcements} />
+            </section>
+          )}
+
           {/* ── Hero Section ──────────────────────────────────────────── */}
           <section className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-20 pb-24 sm:pt-32 sm:pb-32 overflow-hidden">
             <div className="absolute inset-0 pointer-events-none">
@@ -319,6 +343,88 @@ export default function HomePage() {
             </section>
           )}
 
+          {/* ── Featured Events ──────────────────────────────────────── */}
+          {featuredEvents.length > 0 && (
+            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-16">
+              <motion.div
+                variants={fadeUp}
+                custom={0}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                className="mb-10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                    <Star className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white">Featured Events</h2>
+                    <p className="mt-0.5 text-zinc-500">Don&apos;t miss these highlights</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {featuredEvents.slice(0, 2).map((event, i) => (
+                  <motion.div
+                    key={event.id}
+                    variants={scaleIn}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-30px" }}
+                    custom={i}
+                  >
+                    <EventCard event={event} />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Running Events ──────────────────────────────────────── */}
+          {runningEvents.length > 0 && (
+            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-16">
+              <motion.div
+                variants={fadeUp}
+                custom={0}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                className="mb-10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 border border-red-500/20">
+                    <Flame className="h-5 w-5 text-red-400" />
+                    <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white">Running Events</h2>
+                    <p className="mt-0.5 text-zinc-500">Happening right now</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {runningEvents.map((event, i) => (
+                  <motion.div
+                    key={event.id}
+                    variants={scaleIn}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-30px" }}
+                    custom={i}
+                  >
+                    <EventCard event={event} />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* ── Tournament Stats ──────────────────────────────────────── */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
             <motion.div
@@ -465,6 +571,62 @@ export default function HomePage() {
               </Card>
             </motion.div>
           </section>
+
+          {/* ── Upcoming Events ──────────────────────────────────────── */}
+          {allUpcomingEvents.length > 0 && (
+            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+              <motion.div
+                variants={fadeUp}
+                custom={0}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                className="mb-10"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-500/20">
+                      <CalendarDays className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl sm:text-3xl font-bold text-white">Upcoming Events</h2>
+                      <p className="mt-0.5 text-zinc-500">What&apos;s coming next</p>
+                    </div>
+                  </div>
+                  <Link href="/events">
+                    <Button variant="outline" className="group hidden sm:flex">
+                      View All Events
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </Link>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {allUpcomingEvents.slice(0, 4).map((event, i) => (
+                  <motion.div
+                    key={event.id}
+                    variants={scaleIn}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-30px" }}
+                    custom={i}
+                  >
+                    <EventCard event={event} />
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="mt-8 flex justify-center sm:hidden">
+                <Link href="/events">
+                  <Button variant="outline" className="group">
+                    View All Events
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+              </div>
+            </section>
+          )}
 
           {/* ── Championship Arena ────────────────────────────────────── */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 pb-24">

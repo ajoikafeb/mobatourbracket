@@ -19,19 +19,31 @@ import {
   Wand2,
   Sparkles,
   Download,
+  CalendarDays,
+  ClipboardList,
+  Megaphone,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-const sidebarLinks = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/tournament-generator", label: "Tournament Generator", icon: Wand2, highlight: true },
-  { href: "/admin/schedule-generator", label: "Schedule Generator", icon: Sparkles },
-  { href: "/admin/bracket", label: "Bracket Editor", icon: Swords },
-  { href: "/admin/schedule", label: "Schedule Editor", icon: Calendar },
-  { href: "/admin/current-match", label: "Current Match", icon: Radio },
-  { href: "/admin/export", label: "Export Data", icon: Download },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+type SidebarItem =
+  | { type: "link"; href: string; label: string; icon: typeof LayoutDashboard; highlight?: boolean }
+  | { type: "divider" };
+
+const sidebarLinks: SidebarItem[] = [
+  { type: "link", href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { type: "link", href: "/admin/events", label: "Events", icon: CalendarDays },
+  { type: "link", href: "/admin/registrations", label: "Registrations", icon: ClipboardList },
+  { type: "link", href: "/admin/announcements", label: "Announcements", icon: Megaphone },
+  { type: "divider" },
+  { type: "link", href: "/admin/tournament-generator", label: "Tournament Generator", icon: Wand2, highlight: true },
+  { type: "link", href: "/admin/schedule-generator", label: "Schedule Generator", icon: Sparkles },
+  { type: "link", href: "/admin/bracket", label: "Bracket Editor", icon: Swords },
+  { type: "link", href: "/admin/schedule", label: "Schedule Editor", icon: Calendar },
+  { type: "link", href: "/admin/current-match", label: "Current Match", icon: Radio },
+  { type: "link", href: "/admin/export", label: "Export Data", icon: Download },
+  { type: "divider" },
+  { type: "link", href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AdminLayout({
@@ -80,6 +92,35 @@ export default function AdminLayout({
     router.refresh();
   }
 
+  function renderLinks() {
+    return sidebarLinks.map((item, idx) => {
+      if (item.type === "divider") {
+        return (
+          <div key={`divider-${idx}`} className="my-2 border-t border-white/[0.06]" />
+        );
+      }
+      const isActive = pathname === item.href;
+      const Icon = item.icon;
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={cn(
+            "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+            isActive
+              ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+              : item.highlight
+              ? "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/5"
+              : "text-zinc-400 hover:text-white hover:bg-white/5"
+          )}
+        >
+          <Icon className="h-4 w-4" />
+          {item.label}
+        </Link>
+      );
+    });
+  }
+
   return (
     <div className="min-h-screen bg-[#09090B] flex">
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-white/[0.08] bg-[#09090B]">
@@ -91,30 +132,11 @@ export default function AdminLayout({
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {sidebarLinks.map((link) => {
-            const isActive = pathname === link.href;
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
-                    : link.highlight
-                    ? "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/5"
-                    : "text-zinc-400 hover:text-white hover:bg-white/5"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {link.label}
-              </Link>
-            );
-          })}
+          {renderLinks()}
         </nav>
 
         <div className="p-4 border-t border-white/[0.08] space-y-1">
+          <span className="block px-4 pb-2 text-[11px] text-zinc-600 font-medium">v0.0.2</span>
           <Link
             href="/"
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
@@ -164,30 +186,36 @@ export default function AdminLayout({
             >
               <div className="flex flex-col h-full pt-16 pb-6 px-4">
                 <nav className="flex-1 space-y-1 overflow-y-auto">
-                  {sidebarLinks.map((link) => {
-                    const isActive = pathname === link.href;
-                    const Icon = link.icon;
+                  {sidebarLinks.map((item, idx) => {
+                    if (item.type === "divider") {
+                      return (
+                        <div key={`divider-${idx}`} className="my-2 border-t border-white/[0.06]" />
+                      );
+                    }
+                    const isActive = pathname === item.href;
+                    const Icon = item.icon;
                     return (
                       <Link
-                        key={link.href}
-                        href={link.href}
+                        key={item.href}
+                        href={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
                           "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
                           isActive
                             ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
-                            : link.highlight
+                            : item.highlight
                             ? "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/5"
                             : "text-zinc-400 hover:text-white hover:bg-white/5"
                         )}
                       >
                         <Icon className="h-4 w-4" />
-                        {link.label}
+                        {item.label}
                       </Link>
                     );
                   })}
                 </nav>
                 <div className="space-y-1">
+                  <span className="block px-4 pb-2 text-[11px] text-zinc-600 font-medium">v0.0.2</span>
                   <Link
                     href="/"
                     onClick={() => setSidebarOpen(false)}

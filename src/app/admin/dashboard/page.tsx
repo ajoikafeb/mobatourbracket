@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Swords,
@@ -20,6 +21,12 @@ import {
   ChevronRight,
   Award,
   Trash2,
+  CalendarDays,
+  ClipboardList,
+  Megaphone,
+  Plus,
+  Eye,
+  FileText,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +34,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useTournament } from "@/hooks/use-tournament";
 import { cn } from "@/lib/utils";
 import type { Match } from "@/lib/types";
+import type { Event, Announcement, RegistrationResponse } from "@/lib/types";
+import { getEvents } from "@/services/event-service";
+import { getAnnouncements } from "@/services/announcement-service";
+import { getAllRegistrations } from "@/services/registration-service";
 
 const ROUND_ICONS = [Swords, Zap, Swords, Flag, Trophy, Award];
 
@@ -136,6 +147,16 @@ export default function AdminDashboardPage() {
     deleteHistory: doDeleteHistory,
   } = useTournament();
 
+  const [events, setEvents] = useState<Event[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [registrations, setRegistrations] = useState<RegistrationResponse[]>([]);
+
+  useEffect(() => {
+    getEvents().then(setEvents).catch(() => {});
+    getAnnouncements().then(setAnnouncements).catch(() => {});
+    getAllRegistrations().then(setRegistrations).catch(() => {});
+  }, []);
+
   const totalMatches = matches.length;
   const liveMatches = matches.filter((m) => m.status === "live").length;
   const finishedMatches = matches.filter((m) => m.status === "finished").length;
@@ -150,6 +171,18 @@ export default function AdminDashboardPage() {
       return orderA - orderB;
     }
   );
+
+  const eventStatusCounts = events.reduce(
+    (acc, e) => {
+      acc[e.status] = (acc[e.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  const recentEvents = events.slice(0, 5);
+  const pendingRegistrations = registrations.filter((r) => r.status === "pending").length;
+  const totalAnnouncements = announcements.length;
 
   const stats = [
     {
@@ -183,6 +216,26 @@ export default function AdminDashboardPage() {
     .slice(-5)
     .reverse();
 
+  const statusColorMap: Record<string, string> = {
+    draft: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+    registration_open: "bg-green-500/20 text-green-400 border-green-500/30",
+    registration_closed: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    upcoming: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    running: "bg-red-500/20 text-red-400 border-red-500/30",
+    completed: "bg-green-500/20 text-green-400 border-green-500/30",
+    cancelled: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+  };
+
+  const statusLabelMap: Record<string, string> = {
+    draft: "Draft",
+    registration_open: "Registration Open",
+    registration_closed: "Registration Closed",
+    upcoming: "Upcoming",
+    running: "Running",
+    completed: "Completed",
+    cancelled: "Cancelled",
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 p-6 space-y-8">
       <motion.div
@@ -190,10 +243,15 @@ export default function AdminDashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-3xl font-bold text-white">Tournament Control Panel</h1>
-        <p className="text-sm text-zinc-400 mt-1">
-          Central dashboard — manage tournament flow, rounds, and matches
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Tournament Control Panel</h1>
+            <p className="text-sm text-zinc-400 mt-1">
+              Central dashboard — manage tournament flow, rounds, and matches
+            </p>
+          </div>
+          <span className="text-xs text-zinc-600 font-medium">v0.0.2</span>
+        </div>
       </motion.div>
 
       {message && (
@@ -211,11 +269,251 @@ export default function AdminDashboardPage() {
         </motion.div>
       )}
 
+      {/* ── Quick Actions ──────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.05 }}
+      >
+        <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <Zap className="h-4 w-4 text-orange-400" />
+          Quick Actions
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            {
+              href: "/admin/events",
+              label: "Create Event",
+              icon: Plus,
+              color: "bg-green-500/20 text-green-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/announcements",
+              label: "New Announcement",
+              icon: Megaphone,
+              color: "bg-blue-500/20 text-blue-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/registrations",
+              label: "View Registrations",
+              icon: ClipboardList,
+              color: "bg-purple-500/20 text-purple-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/tournament-generator",
+              label: "Tournament Generator",
+              icon: Wand2,
+              color: "bg-orange-500/20 text-orange-400",
+              highlight: true,
+            },
+            {
+              href: "/admin/schedule-generator",
+              label: "Schedule Generator",
+              icon: Calendar,
+              color: "bg-blue-500/20 text-blue-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/bracket",
+              label: "Edit Bracket",
+              icon: Swords,
+              color: "bg-orange-500/20 text-orange-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/current-match",
+              label: "Current Match",
+              icon: Radio,
+              color: "bg-red-500/20 text-red-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/schedule",
+              label: "Edit Schedule",
+              icon: Clock,
+              color: "bg-green-500/20 text-green-400",
+              highlight: false,
+            },
+            {
+              href: "/admin/settings",
+              label: "Settings",
+              icon: Settings,
+              color: "bg-purple-500/20 text-purple-400",
+              highlight: false,
+            },
+          ].map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link key={action.href} href={action.href}>
+                <Card
+                  className={`p-5 transition-all duration-300 group cursor-pointer ${
+                    action.highlight
+                      ? "bg-gradient-to-br from-orange-500/20 to-orange-500/5 border-orange-500/30 hover:border-orange-500/50 col-span-2 lg:col-span-1"
+                      : "bg-zinc-900/50 border-zinc-800 hover:border-zinc-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-xl ${action.color} ${
+                        action.highlight ? "h-14 w-14" : ""
+                      }`}
+                    >
+                      <Icon className={`h-6 w-6 ${action.highlight ? "h-7 w-7" : ""}`} />
+                    </div>
+                    <div className="flex-1">
+                      <p className={`font-medium text-white ${action.highlight ? "text-lg" : "text-sm"}`}>
+                        {action.label}
+                      </p>
+                      {action.highlight && (
+                        <p className="text-xs text-orange-400 mt-0.5">Generate brackets</p>
+                      )}
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-zinc-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* ── Event Overview ────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+      >
+        <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-orange-400" />
+          Event Overview
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          {Object.entries(eventStatusCounts).map(([status, count]) => (
+            <Card key={status} className="p-4 bg-zinc-900/50 border-zinc-800">
+              <div className="flex items-center gap-2">
+                <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium border", statusColorMap[status] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30")}>
+                  {statusLabelMap[status] || status}
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-white mt-2">{count}</p>
+            </Card>
+          ))}
+          {Object.keys(eventStatusCounts).length === 0 && (
+            <Card className="col-span-2 lg:col-span-4 p-8 bg-zinc-900/50 border-zinc-800 text-center">
+              <p className="text-sm text-zinc-500">No events yet</p>
+            </Card>
+          )}
+        </div>
+        {recentEvents.length > 0 && (
+          <Card className="bg-zinc-900/50 border-zinc-800 divide-y divide-zinc-800">
+            <div className="px-4 py-3 flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Recent Events</span>
+              <Link href="/admin/events" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
+                View all
+              </Link>
+            </div>
+            {recentEvents.map((event) => (
+              <div key={event.id} className="flex items-center justify-between p-4 hover:bg-zinc-800/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-4 w-4 text-zinc-500" />
+                  <div>
+                    <p className="text-sm font-medium text-white">{event.title}</p>
+                    <p className="text-xs text-zinc-500">{event.category}</p>
+                  </div>
+                </div>
+                <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium border", statusColorMap[event.status] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30")}>
+                  {statusLabelMap[event.status] || event.status}
+                </span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </motion.div>
+
+      {/* ── Announcements & Registrations Row ─────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+        >
+          <Link href="/admin/announcements">
+            <Card className="p-5 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-all duration-300 cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20">
+                    <Megaphone className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Announcements</p>
+                    <p className="text-2xl font-bold text-white mt-1">{totalAnnouncements}</p>
+                    <p className="text-xs text-zinc-500">Total announcements</p>
+                  </div>
+                </div>
+                <Eye className="h-5 w-5 text-zinc-600 group-hover:text-blue-400 transition-colors" />
+              </div>
+            </Card>
+          </Link>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
+          <Link href="/admin/registrations">
+            <Card className="p-5 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-all duration-300 cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20">
+                    <ClipboardList className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Registrations</p>
+                    <p className="text-2xl font-bold text-white mt-1">{pendingRegistrations}</p>
+                    <p className="text-xs text-zinc-500">Pending review</p>
+                  </div>
+                </div>
+                <Eye className="h-5 w-5 text-zinc-600 group-hover:text-purple-400 transition-colors" />
+              </div>
+            </Card>
+          </Link>
+        </motion.div>
+      </div>
+
+      {/* ── Stats Grid ─────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.25 + i * 0.1 }}
+            >
+              <Card className="p-5 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.color}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
+                <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </div>
+
       {/* ── Tournament Status Banner ─────────────────── */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
       >
         <Card className="p-6 bg-gradient-to-r from-zinc-900/80 via-zinc-900/50 to-zinc-900/80 border-zinc-800">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -392,31 +690,6 @@ export default function AdminDashboardPage() {
         </Card>
       </motion.div>
 
-      {/* ── Stats Grid ─────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.1 }}
-            >
-              <Card className="p-5 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-all duration-300">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.color}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
-                <p className="text-2xl font-bold text-white">{stat.value}</p>
-                <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </div>
-
       {/* ── Current Match ──────────────────────────── */}
       {currentMatch && (
         <motion.div
@@ -475,96 +748,6 @@ export default function AdminDashboardPage() {
           </Card>
         </motion.div>
       )}
-
-      {/* ── Quick Actions ──────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.5 }}
-      >
-        <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Zap className="h-4 w-4 text-orange-400" />
-          Quick Actions
-        </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            {
-              href: "/admin/tournament-generator",
-              label: "Tournament Generator",
-              icon: Wand2,
-              color: "bg-orange-500/20 text-orange-400",
-              highlight: true,
-            },
-            {
-              href: "/admin/schedule-generator",
-              label: "Schedule Generator",
-              icon: Calendar,
-              color: "bg-blue-500/20 text-blue-400",
-              highlight: false,
-            },
-            {
-              href: "/admin/bracket",
-              label: "Edit Bracket",
-              icon: Swords,
-              color: "bg-orange-500/20 text-orange-400",
-              highlight: false,
-            },
-            {
-              href: "/admin/current-match",
-              label: "Current Match",
-              icon: Radio,
-              color: "bg-red-500/20 text-red-400",
-              highlight: false,
-            },
-            {
-              href: "/admin/schedule",
-              label: "Edit Schedule",
-              icon: Clock,
-              color: "bg-green-500/20 text-green-400",
-              highlight: false,
-            },
-            {
-              href: "/admin/settings",
-              label: "Settings",
-              icon: Settings,
-              color: "bg-purple-500/20 text-purple-400",
-              highlight: false,
-            },
-          ].map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link key={action.href} href={action.href}>
-                <Card
-                  className={`p-5 transition-all duration-300 group cursor-pointer ${
-                    action.highlight
-                      ? "bg-gradient-to-br from-orange-500/20 to-orange-500/5 border-orange-500/30 hover:border-orange-500/50 col-span-2 lg:col-span-1"
-                      : "bg-zinc-900/50 border-zinc-800 hover:border-zinc-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-xl ${action.color} ${
-                        action.highlight ? "h-14 w-14" : ""
-                      }`}
-                    >
-                      <Icon className={`h-6 w-6 ${action.highlight ? "h-7 w-7" : ""}`} />
-                    </div>
-                    <div className="flex-1">
-                      <p className={`font-medium text-white ${action.highlight ? "text-lg" : "text-sm"}`}>
-                        {action.label}
-                      </p>
-                      {action.highlight && (
-                        <p className="text-xs text-orange-400 mt-0.5">Generate brackets</p>
-                      )}
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-zinc-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
-                  </div>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      </motion.div>
 
       {/* ── Recent Activity ────────────────────────── */}
       <motion.div
