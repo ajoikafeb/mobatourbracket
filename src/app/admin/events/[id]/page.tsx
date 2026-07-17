@@ -300,7 +300,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Link href={`/admin/events/${eventId}/form`}>
+              <Link href={`/admin/events/${id}/form`}>
                 <Button
                   variant="outline"
                   className="gap-2"
