@@ -474,13 +474,10 @@ export default function AdminRegistrationsPage() {
   function handleCopyList() {
     const approved = registrations.filter((r) => r.status === "approved");
     const lines = approved.map((r, i) => {
-      const parts = [`${i + 1}. ${r.respondent_name}`];
-      if (r.respondent_email) parts.push(r.respondent_email);
-      const dataVals = Object.entries(r.data)
-        .filter(([k, v]) => v && String(v).trim() && k !== "Full Name" && k !== "Email")
-        .map(([k, v]) => `${k}: ${v}`);
-      if (dataVals.length > 0) parts.push(dataVals.join(" | "));
-      return parts.join(" - ");
+      const vals = Object.values(r.data)
+        .filter((v) => v !== null && v !== undefined && v !== "")
+        .map((v) => String(v));
+      return `${i + 1}. ${vals.join(" - ")}`;
     });
     const text = lines.join("\n");
     navigator.clipboard.writeText(text).then(() => {
