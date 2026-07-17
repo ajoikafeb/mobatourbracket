@@ -15,8 +15,6 @@ import { AnimatedBackground } from "@/components/shared/animated-background";
 import { PageWrapper } from "@/components/shared/page-wrapper";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEventBySlug } from "@/services/event-service";
 import {
@@ -60,8 +58,6 @@ export default function RegisterPage({
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Record<string, string>>({});
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const fetchData = useCallback(async () => {
@@ -104,16 +100,13 @@ export default function RegisterPage({
   function validate(): boolean {
     const errors: Record<string, string> = {};
 
-    if (!name.trim()) errors["__name"] = "Name is required.";
-    if (!email.trim()) errors["__email"] = "Email is required.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      errors["__email"] = "Invalid email address.";
-
     for (const field of fields) {
       if (field.required) {
         const val = formData[field.id];
         if (!val || !val.trim()) {
           errors[field.id] = `${field.label} is required.`;
+        } else if (field.field_type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+          errors[field.id] = "Invalid email address.";
         }
       }
     }
@@ -131,11 +124,17 @@ export default function RegisterPage({
     setError(null);
 
     try {
+      const nameField = fields.find((f) => f.field_type === "text" && f.label.toLowerCase().includes("name"));
+      const emailField = fields.find((f) => f.field_type === "email");
+
+      const respondentName = nameField ? (formData[nameField.id] || "").trim() : "Anonymous";
+      const respondentEmail = emailField ? (formData[emailField.id] || "").trim() : "";
+
       await submitRegistration({
         event_id: event.id,
         form_id: form.id,
-        respondent_name: name.trim(),
-        respondent_email: email.trim(),
+        respondent_name: respondentName,
+        respondent_email: respondentEmail,
         data: formData,
         status: "pending",
         notes: "",
@@ -169,10 +168,6 @@ export default function RegisterPage({
               event={event}
               form={form}
               fields={fields}
-              name={name}
-              setName={setName}
-              email={email}
-              setEmail={setEmail}
               formData={formData}
               updateField={updateField}
               validationErrors={validationErrors}
@@ -308,10 +303,6 @@ interface RegisterFormContentProps {
   event: Event;
   form: RegistrationForm;
   fields: RegistrationField[];
-  name: string;
-  setName: (v: string) => void;
-  email: string;
-  setEmail: (v: string) => void;
   formData: Record<string, string>;
   updateField: (fieldId: string, value: string) => void;
   validationErrors: Record<string, string>;
@@ -324,10 +315,6 @@ function RegisterFormContent({
   event,
   form,
   fields,
-  name,
-  setName,
-  email,
-  setEmail,
   formData,
   updateField,
   validationErrors,
@@ -367,50 +354,6 @@ function RegisterFormContent({
         <motion.div variants={fadeUp} custom={2}>
           <Card className="p-6 sm:p-8 bg-white/[0.03] border-white/[0.06]">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Name field */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">
-                  Full Name <span className="text-red-400">*</span>
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={cn(
-                    validationErrors["__name"] && "border-red-500/50 focus-visible:ring-red-500/40"
-                  )}
-                />
-                {validationErrors["__name"] && (
-                  <p className="text-xs text-red-400 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {validationErrors["__name"]}
-                  </p>
-                )}
-              </div>
-
-              {/* Email field */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">
-                  Email <span className="text-red-400">*</span>
-                </label>
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={cn(
-                    validationErrors["__email"] && "border-red-500/50 focus-visible:ring-red-500/40"
-                  )}
-                />
-                {validationErrors["__email"] && (
-                  <p className="text-xs text-red-400 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {validationErrors["__email"]}
-                  </p>
-                )}
-              </div>
-
               {/* Dynamic fields */}
               {fields.map((field) => (
                 <DynamicField

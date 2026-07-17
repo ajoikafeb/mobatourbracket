@@ -37,6 +37,7 @@ import {
   updateField,
   deleteField,
 } from "@/services/registration-service";
+import type { RegistrationField as RegFieldInput } from "@/lib/types";
 import type { RegistrationField, FieldType, Event } from "@/lib/types";
 
 const FIELD_TYPES: { value: FieldType; label: string; icon: typeof Type }[] = [
@@ -99,6 +100,31 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
               description: "",
               is_active: true,
             });
+            const defaultFields: Omit<RegFieldInput, "id" | "created_at">[] = [
+              {
+                form_id: form.id,
+                field_type: "text",
+                label: "Full Name",
+                placeholder: "Enter your full name",
+                required: true,
+                options: [],
+                validation: {},
+                sort_order: 0,
+              },
+              {
+                form_id: form.id,
+                field_type: "email",
+                label: "Email",
+                placeholder: "you@example.com",
+                required: true,
+                options: [],
+                validation: {},
+                sort_order: 1,
+              },
+            ];
+            for (const df of defaultFields) {
+              await createField(df);
+            }
           } catch (formErr: unknown) {
             const msg = formErr instanceof Error ? formErr.message : String(formErr);
             setError(`Failed to create registration form: ${msg}`);
