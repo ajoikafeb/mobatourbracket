@@ -27,14 +27,20 @@ export async function getEventById(id: string): Promise<Event | null> {
 export async function createEvent(event: Omit<Event, "id" | "created_at" | "updated_at" | "current_participants">): Promise<Event> {
   const supabase = createClient();
   const { data, error } = await supabase.from("events").insert(event).select().single();
-  if (error) throw error;
+  if (error) {
+    console.error("[createEvent] Supabase error:", error);
+    throw new Error(`DB Error: ${error.message} (code: ${error.code})`);
+  }
   return data;
 }
 
 export async function updateEvent(id: string, updates: Partial<Event>): Promise<Event> {
   const supabase = createClient();
   const { data, error } = await supabase.from("events").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select().single();
-  if (error) throw error;
+  if (error) {
+    console.error("[updateEvent] Supabase error:", error);
+    throw new Error(`DB Error: ${error.message} (code: ${error.code})`);
+  }
   return data;
 }
 
