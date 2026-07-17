@@ -113,44 +113,13 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS instagram_url TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS website_url TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS version TEXT DEFAULT 'v0.0.2';
 
--- 8. RLS Policies (drop first to avoid conflicts)
-ALTER TABLE event_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE registration_forms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE registration_fields ENABLE ROW LEVEL SECURITY;
-ALTER TABLE registration_responses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public read event categories" ON event_categories;
-DROP POLICY IF EXISTS "Public read published events" ON events;
-DROP POLICY IF EXISTS "Public read active forms" ON registration_forms;
-DROP POLICY IF EXISTS "Public read form fields" ON registration_fields;
-DROP POLICY IF EXISTS "Public read published announcements" ON announcements;
-DROP POLICY IF EXISTS "Auth full access event categories" ON event_categories;
-DROP POLICY IF EXISTS "Auth full access events" ON events;
-DROP POLICY IF EXISTS "Auth full access registration forms" ON registration_forms;
-DROP POLICY IF EXISTS "Auth full access registration fields" ON registration_fields;
-DROP POLICY IF EXISTS "Auth full access registration responses" ON registration_responses;
-DROP POLICY IF EXISTS "Auth full access announcements" ON announcements;
-DROP POLICY IF EXISTS "Anyone can submit registration" ON registration_responses;
-
--- Public read for published content
-CREATE POLICY "Public read event categories" ON event_categories FOR SELECT USING (true);
-CREATE POLICY "Public read published events" ON events FOR SELECT USING (published = true);
-CREATE POLICY "Public read active forms" ON registration_forms FOR SELECT USING (is_active = true);
-CREATE POLICY "Public read form fields" ON registration_fields FOR SELECT USING (true);
-CREATE POLICY "Public read published announcements" ON announcements FOR SELECT USING (published = true);
-
--- Authenticated full access (use auth.uid() for Supabase browser client)
-CREATE POLICY "Auth full access event categories" ON event_categories FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Auth full access events" ON events FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Auth full access registration forms" ON registration_forms FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Auth full access registration fields" ON registration_fields FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Auth full access registration responses" ON registration_responses FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Auth full access announcements" ON announcements FOR ALL USING (auth.uid() IS NOT NULL);
-
--- Anyone can submit registration (insert only)
-CREATE POLICY "Anyone can submit registration" ON registration_responses FOR INSERT WITH CHECK (true);
+-- 8. RLS: disabled (admin auth handled at app level, public read filtered in code)
+ALTER TABLE event_categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE registration_forms DISABLE ROW LEVEL SECURITY;
+ALTER TABLE registration_fields DISABLE ROW LEVEL SECURITY;
+ALTER TABLE registration_responses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements DISABLE ROW LEVEL SECURITY;
 
 -- 9. Enable Realtime (safe to run multiple times)
 DO $$ BEGIN

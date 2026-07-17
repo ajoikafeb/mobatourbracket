@@ -76,6 +76,7 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formId, setFormId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [newType, setNewType] = useState<FieldType>("text");
   const [newLabel, setNewLabel] = useState("");
@@ -91,18 +92,28 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
 
         let form = await getFormByEventId(eventId);
         if (!form) {
-          form = await createForm({
-            event_id: eventId,
-            title: ev?.title ? `${ev.title} Registration` : "Registration Form",
-            description: "",
-            is_active: true,
-          });
+          try {
+            form = await createForm({
+              event_id: eventId,
+              title: ev?.title ? `${ev.title} Registration` : "Registration Form",
+              description: "",
+              is_active: true,
+            });
+          } catch (formErr: unknown) {
+            const msg = formErr instanceof Error ? formErr.message : String(formErr);
+            setError(`Failed to create registration form: ${msg}`);
+            console.error("[FormBuilder] createForm error:", formErr);
+          }
         }
-        setFormId(form.id);
-
-        const existingFields = await getFormFields(form.id);
-        setFields(existingFields);
-      } catch {
+        if (form) {
+          setFormId(form.id);
+          const existingFields = await getFormFields(form.id);
+          setFields(existingFields);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(`Failed to load: ${msg}`);
+        console.error("[FormBuilder] load error:", err);
       } finally {
         setLoading(false);
       }
@@ -111,7 +122,11 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
   }, [eventId]);
 
   const handleAddField = useCallback(() => {
-    if (!newLabel.trim() || !formId) return;
+    if (!newLabel.trim()) return;
+    if (!formId) {
+      setError("Cannot add fields: registration form not initialized. Check that registration_forms table exists.");
+      return;
+    }
 
     const opts = hasOptions(newType)
       ? newOptions.split(",").map((o) => o.trim()).filter(Boolean)
@@ -220,6 +235,18 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
             {saving ? "Saving..." : "Save Fields"}
           </Button>
         </div>
+
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {!formId && !loading && !error && (
+          <div className="mb-6 rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-400">
+            Registration form not found. Make sure the registration_forms and registration_fields tables exist in your database.
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Fields List */}
