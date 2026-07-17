@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Loader2, Wand2, RotateCcw, Flag } from "lucide-react";
+import { Swords, Loader2, Wand2, Users } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { BracketView } from "@/components/bracket/bracket-view";
 import { MatchEditor } from "@/components/admin/match-editor";
 import { BracketToolbar } from "@/components/admin/bracket-toolbar";
+import { TeamListModal } from "@/components/admin/team-list-modal";
 import type { EngineMatch } from "@/engine/types";
 
 export default function AdminBracketPage() {
@@ -30,6 +31,7 @@ export default function AdminBracketPage() {
 
   const [selectedMatch, setSelectedMatch] = useState<EngineMatch | null>(null);
   const [hoveredTeamId, setHoveredTeamId] = useState<string | null>(null);
+  const [showTeamList, setShowTeamList] = useState(false);
 
   const handleMatchClick = useCallback((match: EngineMatch) => {
     setSelectedMatch(match);
@@ -123,6 +125,14 @@ export default function AdminBracketPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 border-zinc-700 text-zinc-300 hover:text-white"
+            onClick={() => setShowTeamList(true)}
+          >
+            <Users className="h-4 w-4" />
+            Manage Teams
+          </Button>
           <Link href="/admin/tournament-generator">
             <Button variant="outline" className="gap-2 border-zinc-700 text-zinc-300 hover:text-white">
               <Wand2 className="h-4 w-4" />
@@ -200,6 +210,12 @@ export default function AdminBracketPage() {
             onSave={handleMatchSave}
             onReset={handleMatchReset}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showTeamList && (
+          <TeamListModal onClose={() => setShowTeamList(false)} />
         )}
       </AnimatePresence>
 
