@@ -30,7 +30,7 @@ export function useEvent(slug: string) {
 
   useEffect(() => {
     if (!slug) { setLoading(false); return; }
-    getEventBySlug(slug).then((e) => { setEvent(e); setLoading(false); });
+    getEventBySlug(slug).then((e) => { setEvent(e); setLoading(false); }).catch(() => { setLoading(false); });
   }, [slug]);
 
   return { event, loading };

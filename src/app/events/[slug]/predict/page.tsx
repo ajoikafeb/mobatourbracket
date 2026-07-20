@@ -144,8 +144,6 @@ export default function PredictPage({
             <PredictSkeleton />
           ) : !event ? (
             <NotFoundState />
-          ) : event.category !== "prediction" ? (
-            <PredictionDisabledState />
           ) : (
             <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
               <motion.div variants={fadeUp} custom={0} initial="hidden" animate="visible">
@@ -379,28 +377,3 @@ function NotFoundState() {
   );
 }
 
-function PredictionDisabledState() {
-  return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-32 text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.06]">
-          <Target className="h-10 w-10 text-zinc-600" />
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-3">Predictions Not Available</h1>
-        <p className="text-zinc-500 mb-8 max-w-md mx-auto">
-          Predictions for this event have not been enabled yet.
-        </p>
-        <Link href="/events">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Events
-          </Button>
-        </Link>
-      </motion.div>
-    </div>
-  );
-}

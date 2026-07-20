@@ -317,7 +317,7 @@ function EventContent({ event }: { event: NonNullable<ReturnType<typeof useEvent
         )}
 
         {/* Prediction CTA */}
-        {event.category === "prediction" && (
+        {(
           <motion.div variants={fadeUp} custom={5.5} className="mb-8">
             <Card className="p-6 border-purple-500/20 bg-purple-500/[0.03]">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
