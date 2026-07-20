@@ -13,6 +13,7 @@ import {
   Clock,
   ExternalLink,
   Target,
+  Trophy,
 } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
@@ -329,16 +330,28 @@ function EventContent({ event }: { event: NonNullable<ReturnType<typeof useEvent
                     Predict match winners and climb the leaderboard
                   </p>
                 </div>
-                <Link href={`/events/${event.slug}/predict`}>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="gap-2 shrink-0 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
-                  >
-                    <Target className="h-4 w-4" />
-                    Predict Now
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href={`/events/${event.slug}/predictors`}>
+                    <Button
+                      size="lg"
+                      variant="ghost"
+                      className="gap-2 shrink-0 text-yellow-400 hover:bg-yellow-500/10"
+                    >
+                      <Trophy className="h-4 w-4" />
+                      Predictors
+                    </Button>
+                  </Link>
+                  <Link href={`/events/${event.slug}/predict`}>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="gap-2 shrink-0 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                    >
+                      <Target className="h-4 w-4" />
+                      Predict Now
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </Card>
           </motion.div>

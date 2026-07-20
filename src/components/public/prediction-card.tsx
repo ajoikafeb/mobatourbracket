@@ -28,7 +28,7 @@ export function PredictionCard({ data, selectedTeamId, onSelect }: PredictionCar
   const isDisabled = predictionStatus !== "open";
   const hasBothTeams = !!(teamA && teamB);
 
-  const effectiveSelection = userPrediction?.selected_team_id || selectedTeamId;
+  const effectiveSelection = selectedTeamId || userPrediction?.selected_team_id;
 
   return (
     <Card className={cn(
