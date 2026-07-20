@@ -79,6 +79,7 @@ export function createClient() {
 
     if (!_client) {
       _client = createBrowserClient(url, key);
+      console.log("[Supabase] Browser client created for:", url);
     }
     return _client;
   } catch {

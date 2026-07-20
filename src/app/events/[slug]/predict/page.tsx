@@ -69,6 +69,9 @@ export default function PredictPage({
   }, []);
 
   const eventId = event?.id || null;
+  React.useEffect(() => {
+    console.log("[PredictPage] slug:", slug, "event:", event ? { id: event.id, title: event.title, category: event.category } : null, "eventLoading:", eventLoading, "eventId:", eventId);
+  }, [slug, event, eventLoading, eventId]);
   const { settings, loading: settingsLoading } = usePredictionSettings(eventId);
   const { matches: predictableMatches, loading: matchesLoading, refetch: refetchMatches } = usePredictableMatches(eventId);
   const { leaderboard, loading: leaderboardLoading } = useLeaderboard(eventId);
