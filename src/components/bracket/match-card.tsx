@@ -13,6 +13,7 @@ interface MatchCardProps {
   onTeamHover?: (teamId: string | null) => void;
   isAdmin?: boolean;
   isFinal?: boolean;
+  predictionCounts?: Record<string, number>;
 }
 
 function getStatusColor(status: EngineMatch["status"]) {
@@ -43,6 +44,7 @@ function TeamRow({
   onHover,
   side,
   matchStatus,
+  predictionCount,
 }: {
   team: EngineTeam | null;
   score: number;
@@ -52,6 +54,7 @@ function TeamRow({
   onHover: (id: string | null) => void;
   side: "A" | "B";
   matchStatus: EngineMatch["status"];
+  predictionCount?: number;
 }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipRect, setTooltipRect] = useState<DOMRect | null>(null);
@@ -138,6 +141,12 @@ function TeamRow({
         >
           {matchStatus === "finished" || matchStatus === "live" ? score : ""}
         </span>
+
+        {predictionCount !== undefined && predictionCount > 0 && (
+          <span className="flex items-center gap-0.5 ml-0.5 px-1 py-0.5 rounded bg-purple-500/15 text-[9px] font-medium text-purple-400 leading-none">
+            {predictionCount}
+          </span>
+        )}
       </div>
 
       {showTooltip && team && !isBye && tooltipRect && createPortal(
@@ -155,6 +164,7 @@ export function MatchCard({
   onTeamHover,
   isAdmin,
   isFinal,
+  predictionCounts,
 }: MatchCardProps) {
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
@@ -162,6 +172,9 @@ export function MatchCard({
   const isWinnerB = !!(isFinished && match.winnerId === match.teamB?.id);
   const isLoserA = !!(isFinished && match.winnerId && !isWinnerA);
   const isLoserB = !!(isFinished && match.winnerId && !isWinnerB);
+
+  const teamAPredictions = predictionCounts?.[match.teamA?.id || ""] || 0;
+  const teamBPredictions = predictionCounts?.[match.teamB?.id || ""] || 0;
 
   return (
     <div
@@ -200,6 +213,7 @@ export function MatchCard({
           onHover={onTeamHover || (() => {})}
           side="A"
           matchStatus={match.status}
+          predictionCount={teamAPredictions}
         />
         <TeamRow
           team={match.teamB}
@@ -210,6 +224,7 @@ export function MatchCard({
           onHover={onTeamHover || (() => {})}
           side="B"
           matchStatus={match.status}
+          predictionCount={teamBPredictions}
         />
       </div>
 

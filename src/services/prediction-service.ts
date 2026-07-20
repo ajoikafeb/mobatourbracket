@@ -1,6 +1,25 @@
 import { createClient } from "@/lib/supabase/client";
 import type { PredictionSettings, PredictionUser, PredictionEntry, LeaderboardEntry, PredictionEventMatch } from "@/lib/prediction-types";
 
+export type PredictionCountMap = Record<string, Record<string, number>>; // { matchId: { teamId: count } }
+
+export async function getPredictionCountsByMatch(matchIds: string[]): Promise<PredictionCountMap> {
+  if (matchIds.length === 0) return {};
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("prediction_entries")
+    .select("match_id, selected_team_id")
+    .in("match_id", matchIds);
+  if (error) return {};
+  const counts: PredictionCountMap = {};
+  for (const row of data) {
+    if (!counts[row.match_id]) counts[row.match_id] = {};
+    const teamCounts = counts[row.match_id];
+    teamCounts[row.selected_team_id] = (teamCounts[row.selected_team_id] || 0) + 1;
+  }
+  return counts;
+}
+
 export async function getPredictionSettings(eventId: string): Promise<PredictionSettings | null> {
   const supabase = createClient();
   const { data, error } = await supabase

@@ -501,6 +501,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     if (!file) return;
                     try {
                       const url = await uploadEventMedia(file, "banners");
+                      console.log("[upload] banner URL:", url);
                       updateField("banner", url);
                     } catch (err) {
                       const msg = err instanceof Error ? err.message : "Banner upload failed.";

@@ -5,6 +5,7 @@ import type { EngineMatch, EngineBracket, RoundName } from "@/engine/types";
 import { ROUND_ORDER, ROUND_CONFIG } from "@/lib/types";
 import { MatchCard } from "./match-card";
 import { ChampionDisplay } from "./champion-display";
+import type { PredictionCountMap } from "@/services/prediction-service";
 
 interface BracketViewProps {
   bracket: EngineBracket;
@@ -12,6 +13,7 @@ interface BracketViewProps {
   hoveredTeamId?: string | null;
   onTeamHover?: (teamId: string | null) => void;
   isAdmin?: boolean;
+  predictionCounts?: PredictionCountMap;
 }
 
 const CARD_H = 56;
@@ -24,6 +26,7 @@ export function BracketView({
   hoveredTeamId,
   onTeamHover,
   isAdmin,
+  predictionCounts,
 }: BracketViewProps) {
   const activeRounds = useMemo(() => {
     const roundNames = new Set(bracket.matches.map((m) => m.round));
@@ -125,6 +128,7 @@ export function BracketView({
                         onTeamHover={onTeamHover}
                         isAdmin={isAdmin}
                         isFinal={isFinal}
+                        predictionCounts={predictionCounts?.[match.id]}
                       />
                     </div>
                   );

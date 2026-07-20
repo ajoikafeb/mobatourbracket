@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Swords } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
@@ -11,10 +11,19 @@ import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useTournament } from "@/hooks/use-tournament";
 import { BracketView } from "@/components/bracket/bracket-view";
+import { getPredictionCountsByMatch } from "@/services/prediction-service";
+import type { PredictionCountMap } from "@/services/prediction-service";
 
 export default function BracketPage() {
   const { bracket, settings, loading } = useTournament();
   const [hoveredTeamId, setHoveredTeamId] = useState<string | null>(null);
+  const [predictionCounts, setPredictionCounts] = useState<PredictionCountMap>({});
+
+  useEffect(() => {
+    if (bracket.matches.length === 0) return;
+    const matchIds = bracket.matches.map((m) => m.id);
+    getPredictionCountsByMatch([...new Set(matchIds)]).then(setPredictionCounts);
+  }, [bracket.matches]);
 
   const handleTeamHover = useCallback((teamId: string | null) => {
     setHoveredTeamId(teamId);
@@ -63,6 +72,7 @@ export default function BracketPage() {
                 bracket={bracket}
                 hoveredTeamId={hoveredTeamId}
                 onTeamHover={handleTeamHover}
+                predictionCounts={predictionCounts}
               />
             )}
           </div>
