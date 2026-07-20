@@ -399,7 +399,7 @@ export default function AdminSettingsPage() {
               </label>
               <div className="relative">
                 <Input
-                  value="v0.0.2"
+                  value="v0.0.3"
                   readOnly
                   className="text-zinc-400"
                 />

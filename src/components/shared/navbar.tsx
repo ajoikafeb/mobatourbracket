@@ -14,21 +14,27 @@ import {
   Shield,
   Home,
   Trophy,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-
-const navLinks = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/bracket", label: "Bracket", icon: Swords },
-  { href: "/schedule", label: "Schedule", icon: Calendar },
-  { href: "/current-match", label: "Live", icon: Radio },
-  { href: "/events", label: "Events", icon: Trophy },
-];
+import { useEvents } from "@/hooks/use-events";
 
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { events } = useEvents(true);
+
+  const hasPredictionEvents = events.some((e) => e.prediction_enabled);
+
+  const navLinks = [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/bracket", label: "Bracket", icon: Swords },
+    { href: "/schedule", label: "Schedule", icon: Calendar },
+    { href: "/current-match", label: "Live", icon: Radio },
+    { href: "/events", label: "Events", icon: Trophy },
+    ...(hasPredictionEvents ? [{ href: "/events?predict=true", label: "Predictions", icon: Target }] : []),
+  ];
 
   return (
     <>

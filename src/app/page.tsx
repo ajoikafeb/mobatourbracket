@@ -31,6 +31,8 @@ import { EventCard } from "@/components/public/event-card";
 import { useTournament } from "@/hooks/use-tournament";
 import { useAnnouncements } from "@/hooks/use-announcements";
 import { useFeaturedEvents, useEventsByStatus } from "@/hooks/use-events";
+import { useTopPredictor } from "@/hooks/use-predictions";
+import { TopPredictor } from "@/components/public/top-predictor";
 import { ROUND_CONFIG } from "@/lib/types";
 import type { RoundName, Event } from "@/lib/types";
 import { cn, formatDate, formatTime } from "@/lib/utils";
@@ -84,6 +86,7 @@ export default function HomePage() {
   const { events: runningEvents } = useEventsByStatus("running");
   const { events: upcomingEvents } = useEventsByStatus("upcoming");
   const { events: regOpenEvents } = useEventsByStatus("registration_open");
+  const { topPredictors } = useTopPredictor();
 
   const nextMatch = !currentMatch
     ? matches
@@ -625,6 +628,32 @@ export default function HomePage() {
                   </Button>
                 </Link>
               </div>
+            </section>
+          )}
+
+          {/* ── Championship Arena ────────────────────────────────────── */}
+          {topPredictors.length > 0 && (
+            <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+              <motion.div
+                variants={fadeUp}
+                custom={0}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                className="mb-10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                    <Target className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white">Top Predictors</h2>
+                    <p className="mt-0.5 text-zinc-500">Community prediction leaders</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <TopPredictor topPredictors={topPredictors} />
             </section>
           )}
 

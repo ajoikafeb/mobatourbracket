@@ -21,6 +21,7 @@ import {
   Star,
   RefreshCw,
   ClipboardList,
+  Target,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,7 @@ interface FormData {
   max_participants: number;
   featured: boolean;
   published: boolean;
+  prediction_enabled: boolean;
 }
 
 const EMPTY_FORM: FormData = {
@@ -100,6 +102,7 @@ const EMPTY_FORM: FormData = {
   max_participants: 0,
   featured: false,
   published: false,
+  prediction_enabled: false,
 };
 
 const container = {
@@ -150,6 +153,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           max_participants: event.max_participants,
           featured: event.featured,
           published: event.published,
+          prediction_enabled: event.prediction_enabled || false,
         });
       } catch {
         if (!cancelled) setNotFound(true);
@@ -194,6 +198,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       max_participants: form.max_participants,
       featured: form.featured,
       published: publishOverride ?? form.published,
+      prediction_enabled: form.prediction_enabled,
     }),
     [form]
   );
@@ -653,6 +658,30 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     className={cn(
                       "inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200",
                       form.featured ? "translate-x-6" : "translate-x-1"
+                    )}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  <Target className="h-4 w-4 text-zinc-400" />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-200">Predictions</p>
+                    <p className="text-xs text-zinc-500">Enable match predictions for this event.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateField("prediction_enabled", !form.prediction_enabled)}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40",
+                    form.prediction_enabled ? "bg-orange-500" : "bg-zinc-700"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200",
+                      form.prediction_enabled ? "translate-x-6" : "translate-x-1"
                     )}
                   />
                 </button>

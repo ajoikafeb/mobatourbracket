@@ -12,6 +12,7 @@ import {
   Tag,
   Clock,
   ExternalLink,
+  Target,
 } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
@@ -308,6 +309,34 @@ function EventContent({ event }: { event: NonNullable<ReturnType<typeof useEvent
                   >
                     <ExternalLink className="h-4 w-4" />
                     Register Now
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Prediction CTA */}
+        {event.prediction_enabled && (event.status === "running" || event.status === "upcoming") && (
+          <motion.div variants={fadeUp} custom={5.5} className="mb-8">
+            <Card className="p-6 border-purple-500/20 bg-purple-500/[0.03]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-white mb-1">
+                    Make Your Predictions
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    Predict match winners and climb the leaderboard
+                  </p>
+                </div>
+                <Link href={`/events/${event.slug}/predict`}>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="gap-2 shrink-0 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                  >
+                    <Target className="h-4 w-4" />
+                    Predict Now
                   </Button>
                 </Link>
               </div>

@@ -22,6 +22,7 @@ import {
   CalendarDays,
   ClipboardList,
   Megaphone,
+  Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,8 @@ const sidebarLinks: SidebarItem[] = [
   { type: "link", href: "/admin/schedule", label: "Schedule Editor", icon: Calendar },
   { type: "link", href: "/admin/current-match", label: "Current Match", icon: Radio },
   { type: "link", href: "/admin/export", label: "Export Data", icon: Download },
+  { type: "divider" },
+  { type: "link", href: "/admin/predictions", label: "Predictions", icon: Target },
   { type: "divider" },
   { type: "link", href: "/admin/settings", label: "Settings", icon: Settings },
 ];
@@ -136,7 +139,7 @@ export default function AdminLayout({
         </nav>
 
         <div className="p-4 border-t border-white/[0.08] space-y-1">
-          <span className="block px-4 pb-2 text-[11px] text-zinc-600 font-medium">v0.0.2</span>
+                  <span className="block px-4 pb-2 text-[11px] text-zinc-600 font-medium">v0.0.3</span>
           <Link
             href="/"
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
@@ -215,7 +218,7 @@ export default function AdminLayout({
                   })}
                 </nav>
                 <div className="space-y-1">
-                  <span className="block px-4 pb-2 text-[11px] text-zinc-600 font-medium">v0.0.2</span>
+          <span className="block px-4 pb-2 text-[11px] text-zinc-600 font-medium">v0.0.3</span>
                   <Link
                     href="/"
                     onClick={() => setSidebarOpen(false)}

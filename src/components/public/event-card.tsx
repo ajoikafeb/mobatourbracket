@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Users, Tag } from "lucide-react";
+import { Calendar, MapPin, Users, Tag, Target } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { Event } from "@/lib/types";
 import { EVENT_STATUS_MAP, EVENT_CATEGORY_MAP } from "@/lib/types";
@@ -71,6 +71,12 @@ export function EventCard({ event, className }: EventCardProps) {
                 <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2.5 py-0.5 text-[10px] font-medium text-orange-400 backdrop-blur-sm">
                   <Tag className="h-2.5 w-2.5" />
                   {categoryLabel}
+                </span>
+              )}
+              {event.prediction_enabled && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-medium text-purple-400 backdrop-blur-sm">
+                  <Target className="h-2.5 w-2.5" />
+                  Predict
                 </span>
               )}
             </div>

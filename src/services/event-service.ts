@@ -26,7 +26,11 @@ export async function getEventById(id: string): Promise<Event | null> {
 
 export async function createEvent(event: Omit<Event, "id" | "created_at" | "updated_at" | "current_participants">): Promise<Event> {
   const supabase = createClient();
-  const { data, error } = await supabase.from("events").insert(event).select().single();
+  const payload = {
+    ...event,
+    prediction_enabled: (event as Record<string, unknown>).prediction_enabled ?? false,
+  };
+  const { data, error } = await supabase.from("events").insert(payload).select().single();
   if (error) {
     console.error("[createEvent] Supabase error:", error);
     throw new Error(`DB Error: ${error.message} (code: ${error.code})`);
@@ -61,6 +65,7 @@ export async function duplicateEvent(id: string): Promise<Event> {
     status: "draft",
     published: false,
     featured: false,
+    prediction_enabled: false,
   });
   return newEvent;
 }

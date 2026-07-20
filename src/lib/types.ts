@@ -148,6 +148,7 @@ export interface Event {
   current_participants: number;
   featured: boolean;
   published: boolean;
+  prediction_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
