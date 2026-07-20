@@ -202,6 +202,20 @@ export async function calculatePredictionResults(
 
 // ── Prediction Event Matches (junction table) ──────────
 
+export async function updateEventParticipantCount(eventId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: entries } = await supabase
+    .from("prediction_entries")
+    .select("discord_username")
+    .eq("event_id", eventId);
+  if (!entries) return;
+  const uniqueCount = new Set(entries.map((e: { discord_username: string }) => e.discord_username)).size;
+  await supabase
+    .from("events")
+    .update({ current_participants: uniqueCount })
+    .eq("id", eventId);
+}
+
 export async function getPredictionEventMatches(predictionEventId: string): Promise<string[]> {
   const supabase = createClient();
   const { data, error } = await supabase

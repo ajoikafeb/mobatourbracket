@@ -26,7 +26,7 @@ import { PredictionCard } from "@/components/public/prediction-card";
 import { Leaderboard } from "@/components/public/leaderboard";
 import { useEvent } from "@/hooks/use-events";
 import { usePredictionSettings, usePredictableMatches, useLeaderboard } from "@/hooks/use-predictions";
-import { bulkUpsertPredictions, getOrCreatePredictionUser } from "@/services/prediction-service";
+import { bulkUpsertPredictions, getOrCreatePredictionUser, updateEventParticipantCount } from "@/services/prediction-service";
 import { cn } from "@/lib/utils";
 import type { PredictionEntry } from "@/lib/prediction-types";
 
@@ -110,6 +110,7 @@ export default function PredictPage({
     try {
       await getOrCreatePredictionUser(username.trim());
       await bulkUpsertPredictions(pendingEntries);
+      updateEventParticipantCount(eventId).catch(() => {});
       setMessage({ type: "success", text: `${pendingEntries.length} prediction${pendingEntries.length > 1 ? "s" : ""} saved!` });
       setTimeout(() => setMessage(null), 3000);
       setSelections({});
@@ -315,12 +316,22 @@ export default function PredictPage({
                 )}
 
                 {/* Leaderboard */}
-                {settings?.leaderboard_enabled && (
+                {(!settings || settings.leaderboard_enabled !== false) && (
                   <motion.div variants={fadeUp} custom={6}>
                     <Leaderboard
                       leaderboard={leaderboard}
                       highlight={usernameSaved ? username : undefined}
                     />
+                    {leaderboard.length > 0 && (
+                      <div className="mt-4 text-center">
+                        <Link
+                          href={`/events/${slug}/predictors`}
+                          className="text-sm text-zinc-500 hover:text-orange-400 transition-colors"
+                        >
+                          View All Predictors &rarr;
+                        </Link>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </motion.div>
