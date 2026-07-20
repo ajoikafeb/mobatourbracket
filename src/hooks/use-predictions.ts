@@ -218,8 +218,10 @@ export function usePredictableMatches(eventId: string | null) {
           if (match.status === "live") return "locked";
           if (match.match_date) {
             const matchTime = new Date(match.match_date).getTime();
-            const lockTime = matchTime - lockMinutes * 60 * 1000;
-            if (Date.now() > lockTime) return "locked";
+            if (matchTime > Date.now()) {
+              const lockTime = matchTime - lockMinutes * 60 * 1000;
+              if (Date.now() > lockTime) return "locked";
+            }
           }
           return "open";
         })();
