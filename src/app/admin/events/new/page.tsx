@@ -125,27 +125,13 @@ export default function NewEventPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Prediction event match selection
-  const [tournamentEvents, setTournamentEvents] = useState<{ id: string; title: string }[]>([]);
-  const [sourceEventId, setSourceEventId] = useState("");
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
 
-  // Load tournament events when category changes to prediction
+  // Load all matches when category changes to prediction
   useEffect(() => {
     if (form.category !== "prediction") return;
-    import("@/lib/supabase/client").then(({ createClient }) => {
-      const supabase = createClient();
-      supabase.from("events").select("id, title").eq("category", "tournament").order("title")
-        .then(({ data }: { data: { id: string; title: string }[] | null }) => {
-          if (data) setTournamentEvents(data);
-        });
-    });
-  }, [form.category]);
-
-  // Load matches when source event is selected
-  useEffect(() => {
-    if (!sourceEventId || form.category !== "prediction") return;
     setLoadingMatches(true);
     import("@/lib/supabase/client").then(({ createClient }) => {
       const supabase = createClient();
@@ -155,7 +141,7 @@ export default function NewEventPage() {
           setLoadingMatches(false);
         }).catch(() => setLoadingMatches(false));
     });
-  }, [sourceEventId, form.category]);
+  }, [form.category]);
 
   const updateField = useCallback(
     <K extends keyof FormData>(key: K, value: FormData[K]) => {
@@ -570,30 +556,14 @@ export default function NewEventPage() {
                 <CardDescription>Choose which tournament matches are available for prediction.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-300">Source Tournament</label>
-                  <Select
-                    value={sourceEventId}
-                    onChange={(e) => {
-                      setSourceEventId(e.target.value);
-                      setSelectedMatchIds([]);
-                    }}
-                  >
-                    <option value="">Select a tournament...</option>
-                    {tournamentEvents.map((te) => (
-                      <option key={te.id} value={te.id}>{te.title}</option>
-                    ))}
-                  </Select>
-                </div>
-
-                {sourceEventId && loadingMatches && (
+                {loadingMatches && (
                   <div className="flex items-center gap-2 py-4 text-sm text-zinc-400">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading matches...
                   </div>
                 )}
 
-                {sourceEventId && !loadingMatches && allMatches.length === 0 && (
+                {!loadingMatches && allMatches.length === 0 && (
                   <p className="text-sm text-zinc-500 py-4">No matches found. Generate a schedule first.</p>
                 )}
 
