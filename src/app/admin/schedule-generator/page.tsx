@@ -233,7 +233,7 @@ export default function ScheduleGeneratorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 md:p-8">
+    <div className="min-h-screen bg-gray-950 text-white">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}

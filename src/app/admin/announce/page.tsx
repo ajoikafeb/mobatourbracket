@@ -187,7 +187,7 @@ export default function AnnounceWinnerPage() {
 
   if (tournamentState !== "completed" || !champion) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <Card className="p-8 text-center max-w-md">
           <Trophy className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Tournament Not Complete</h2>
@@ -209,7 +209,7 @@ export default function AnnounceWinnerPage() {
   const topOptions = [1, 2, 3, 4, 8];
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6 space-y-8">
+    <div className="min-h-screen bg-zinc-950 space-y-8">
       {/* ── Header ─────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

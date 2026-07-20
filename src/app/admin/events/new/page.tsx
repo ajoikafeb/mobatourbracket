@@ -239,7 +239,7 @@ export default function NewEventPage() {
   }, [message]);
 
   return (
-    <div className="min-h-screen bg-[#09090B] p-6">
+    <div className="min-h-screen bg-[#09090B]">
       <motion.div variants={container} initial="hidden" animate="show" className="max-w-4xl mx-auto space-y-6">
         {/* ── Header ──────────────────────────── */}
         <motion.div variants={item}>

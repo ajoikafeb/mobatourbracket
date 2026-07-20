@@ -322,7 +322,7 @@ export default function AdminEventsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090B] p-6 space-y-6">
+    <div className="min-h-screen bg-[#09090B] space-y-6">
       {/* ── Header ─────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

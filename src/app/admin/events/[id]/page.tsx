@@ -286,7 +286,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090B] p-6">
+      <div className="min-h-screen bg-[#09090B]">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="h-8 w-32 bg-white/[0.06] rounded-lg animate-pulse" />
           <div className="h-10 w-64 bg-white/[0.06] rounded-lg animate-pulse" />
@@ -304,7 +304,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[#09090B] p-6">
+      <div className="min-h-screen bg-[#09090B]">
         <div className="max-w-4xl mx-auto text-center py-20">
           <AlertCircle className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Event Not Found</h2>
@@ -323,7 +323,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <div className="min-h-screen bg-[#09090B] p-6">
+    <div className="min-h-screen bg-[#09090B]">
       <motion.div variants={container} initial="hidden" animate="show" className="max-w-4xl mx-auto space-y-6">
         {/* ── Header ──────────────────────────── */}
         <motion.div variants={item}>

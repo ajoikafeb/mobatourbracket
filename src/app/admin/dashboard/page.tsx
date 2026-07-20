@@ -237,7 +237,7 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6 space-y-8">
+    <div className="min-h-screen bg-zinc-950 space-y-8">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}

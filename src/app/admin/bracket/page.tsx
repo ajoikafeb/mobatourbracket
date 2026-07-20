@@ -111,7 +111,7 @@ export default function AdminBracketPage() {
   if (loading) return <LoadingSkeleton />;
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6 space-y-6">
+    <div className="min-h-screen bg-zinc-950 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20">

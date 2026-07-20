@@ -632,7 +632,7 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090B] p-6 space-y-6">
+    <div className="min-h-screen bg-[#09090B] space-y-6">
       {/* ── Feedback Toast ─────────────────────────── */}
       <AnimatePresence>
         {feedback && (
