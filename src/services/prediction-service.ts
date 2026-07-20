@@ -41,7 +41,7 @@ export async function getPredictionEntries(
     .order("submitted_at", { ascending: false });
   if (username) query = query.eq("discord_username", username);
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) return [];
   return data || [];
 }
 

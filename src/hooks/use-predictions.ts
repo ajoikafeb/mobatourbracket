@@ -195,9 +195,8 @@ export function usePredictableMatches(eventId: string | null) {
   const cancelledRef = useRef(false);
 
   const fetchData = useCallback(async () => {
-    if (!eventId) { console.log("[Prediction] no eventId, skipping"); setLoading(false); return; }
+    if (!eventId) { setLoading(false); return; }
     try {
-      console.log("[Prediction] fetching for eventId:", eventId);
       const supabase = createClient();
 
       const [matchesResult, teamsResult, settingsResult, entriesResult] = await Promise.all([
@@ -206,11 +205,6 @@ export function usePredictableMatches(eventId: string | null) {
         getPredictionSettings(eventId).catch(() => null),
         getPredictionEntries(eventId).catch(() => []),
       ]);
-
-      console.log("[Prediction] matchesResult:", matchesResult.error ? `ERROR: ${matchesResult.error.message}` : `${matchesResult.data?.length ?? 0} matches`, matchesResult.data);
-      console.log("[Prediction] teamsResult:", teamsResult.error ? `ERROR: ${teamsResult.error.message}` : `${teamsResult.data?.length ?? 0} teams`);
-      console.log("[Prediction] settingsResult:", settingsResult);
-      console.log("[Prediction] entriesResult:", entriesResult?.length ?? 0, "entries");
 
       const allMatches: Match[] = matchesResult.data || [];
       const allTeams: Team[] = teamsResult.data || [];
