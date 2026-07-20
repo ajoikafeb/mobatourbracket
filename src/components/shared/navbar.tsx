@@ -26,14 +26,19 @@ export function Navbar() {
   const { events } = useEvents(true);
 
   const hasPredictionEvents = events.some((e) => e.category === "prediction");
+  const isPredictSubPage = pathname.includes("/predict");
+  const isEventsActive = !isPredictSubPage && (pathname === "/events" || pathname.startsWith("/events/"));
+  const isPredictionsActive = isPredictSubPage;
 
   const navLinks = [
     { href: "/", label: "Home", icon: Home },
     { href: "/bracket", label: "Bracket", icon: Swords },
     { href: "/schedule", label: "Schedule", icon: Calendar },
     { href: "/current-match", label: "Live", icon: Radio },
-    { href: "/events", label: "Events", icon: Trophy },
-    ...(hasPredictionEvents ? [{ href: "/events?predict=true", label: "Predictions", icon: Target }] : []),
+    { href: "/events", label: "Events", icon: Trophy, isActive: isEventsActive },
+    ...(hasPredictionEvents
+      ? [{ href: "/events?predict=true", label: "Predictions", icon: Target, isActive: isPredictionsActive }]
+      : []),
   ];
 
   return (
@@ -67,8 +72,9 @@ export function Navbar() {
           <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-0.5 p-1 rounded-2xl bg-white/[0.03] border border-white/[0.04]">
             {navLinks.map((link) => {
               const isActive =
-                pathname === link.href ||
-                (link.href !== "/" && pathname.startsWith(link.href));
+                link.isActive ??
+                (pathname === link.href ||
+                (link.href !== "/" && pathname.startsWith(link.href)));
               const Icon = link.icon;
               return (
                 <Link
@@ -131,8 +137,9 @@ export function Navbar() {
             <div className="mx-auto max-w-7xl px-4 py-3 space-y-1">
               {navLinks.map((link) => {
                 const isActive =
-                  pathname === link.href ||
-                  (link.href !== "/" && pathname.startsWith(link.href));
+                  link.isActive ??
+                  (pathname === link.href ||
+                  (link.href !== "/" && pathname.startsWith(link.href)));
                 const Icon = link.icon;
                 return (
                   <Link
