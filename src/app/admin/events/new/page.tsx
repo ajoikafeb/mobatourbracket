@@ -257,7 +257,7 @@ export default function NewEventPage() {
                 Fill in the details below to create a new event.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 variant="outline"
                 onClick={handleSave}

@@ -330,7 +330,7 @@ function EventContent({ event }: { event: NonNullable<ReturnType<typeof useEvent
                     Predict match winners and climb the leaderboard
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/events/${event.slug}/predictors`}>
                     <Button
                       size="lg"

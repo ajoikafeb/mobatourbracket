@@ -265,7 +265,7 @@ export default function AdminPredictionsPage() {
                         <p className="text-xs text-zinc-500 capitalize">{event.category} · {event.status}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/admin/predictions/leaderboard?event=${event.id}`}>
                         <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-400 hover:text-white">
                           <Trophy className="h-3.5 w-3.5" />

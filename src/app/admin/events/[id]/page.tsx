@@ -341,7 +341,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 Update the details for <span className="text-orange-400 font-medium">{form.title}</span>
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Link href={`/admin/events/${id}/form`}>
                 <Button
                   variant="outline"
