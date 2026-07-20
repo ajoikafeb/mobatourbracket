@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Target,
@@ -15,12 +15,14 @@ import {
   ToggleLeft,
   ToggleRight,
   Settings,
+  AlertTriangle,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useEvents } from "@/hooks/use-events";
+import { deleteEvent } from "@/services/event-service";
 import {
   getPredictionSettings,
   upsertPredictionSettings,
@@ -42,7 +44,7 @@ const itemVariants = {
 };
 
 export default function AdminPredictionsPage() {
-  const { events, loading: eventsLoading } = useEvents();
+  const { events, loading: eventsLoading, refetch } = useEvents();
   const [settingsMap, setSettingsMap] = useState<Record<string, PredictionSettings>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -54,6 +56,8 @@ export default function AdminPredictionsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const tournamentEvents = events.filter(
     (e) => e.category === "prediction"
@@ -138,6 +142,22 @@ export default function AdminPredictionsPage() {
       setTimeout(() => setMessage(null), 3000);
     }
   }, []);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteEvent(deleteTarget.id);
+      setDeleteTarget(null);
+      refetch();
+      setMessage({ type: "success", text: "Prediction event deleted." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to delete event." });
+    } finally {
+      setDeleting(false);
+      setTimeout(() => setMessage(null), 3000);
+    }
+  }, [deleteTarget, refetch]);
 
   if (eventsLoading) {
     return (
@@ -253,6 +273,15 @@ export default function AdminPredictionsPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         )}
                         Reset
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        onClick={() => setDeleteTarget(event)}
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Delete
                       </Button>
                       <Button
                         variant="outline"
@@ -384,6 +413,62 @@ export default function AdminPredictionsPage() {
           );
         })
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setDeleteTarget(null)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#18181B]/95 backdrop-blur-xl p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 border border-red-500/25">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Delete Prediction Event</h3>
+                  <p className="text-sm text-zinc-400 mt-0.5">This action cannot be undone.</p>
+                </div>
+              </div>
+              <p className="text-sm text-zinc-300 mb-2">
+                Are you sure you want to delete <span className="font-semibold text-white">{deleteTarget.title}</span>?
+              </p>
+              <p className="text-xs text-zinc-500 mb-6">
+                All predictions, user stats, and associated data will be permanently removed.
+              </p>
+              <div className="flex items-center justify-end gap-3">
+                <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="gap-2"
+                >
+                  {deleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete Event
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
