@@ -7,6 +7,7 @@ export interface PredictionSettings {
   lock_minutes_before: number;
   leaderboard_enabled: boolean;
   points_enabled: boolean;
+  closed_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -31,6 +31,7 @@ import { createEvent } from "@/services/event-service";
 import { setPredictionEventMatches } from "@/services/prediction-service";
 import type { EventCategory, EventStatus, RegistrationStatus } from "@/lib/types";
 import { EVENT_CATEGORY_MAP } from "@/lib/types";
+import { uploadEventMedia } from "@/services/upload-service";
 import type { Match } from "@/lib/types";
 
 function generateSlug(title: string): string {
@@ -396,22 +397,42 @@ export default function NewEventPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Banner URL</label>
+                <label className="text-sm font-medium text-zinc-300">Banner</label>
                 <Input
-                  placeholder="https://example.com/banner.jpg"
-                  value={form.banner}
-                  onChange={(e) => updateField("banner", e.target.value)}
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const url = await uploadEventMedia(file, "banners");
+                      updateField("banner", url);
+                    } catch {
+                      setMessage({ type: "error", text: "Banner upload failed." });
+                      setTimeout(() => setMessage(null), 3000);
+                    }
+                  }}
                 />
                 <p className="text-xs text-zinc-500">
                   Wide image used as the event header. Recommended: 1200x400px.
                 </p>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Thumbnail URL</label>
+                <label className="text-sm font-medium text-zinc-300">Thumbnail</label>
                 <Input
-                  placeholder="https://example.com/thumb.jpg"
-                  value={form.thumbnail}
-                  onChange={(e) => updateField("thumbnail", e.target.value)}
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const url = await uploadEventMedia(file, "thumbnails");
+                      updateField("thumbnail", url);
+                    } catch {
+                      setMessage({ type: "error", text: "Thumbnail upload failed." });
+                      setTimeout(() => setMessage(null), 3000);
+                    }
+                  }}
                 />
                 <p className="text-xs text-zinc-500">
                   Square image used in event cards. Recommended: 400x400px.

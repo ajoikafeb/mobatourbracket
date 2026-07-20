@@ -13,6 +13,7 @@ import {
   User,
   Calendar,
   Trophy,
+  Lock,
 } from "lucide-react";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
@@ -70,6 +71,7 @@ export default function PredictPage({
 
   const eventId = event?.id || null;
   const { settings, loading: settingsLoading } = usePredictionSettings(eventId);
+  const isClosed = settings?.closed_at ? new Date(settings.closed_at).getTime() < Date.now() : false;
   const { matches: predictableMatches, loading: matchesLoading, refetch: refetchMatches } = usePredictableMatches(eventId);
   const { leaderboard, loading: leaderboardLoading } = useLeaderboard(eventId);
 
@@ -267,6 +269,23 @@ export default function PredictPage({
                       <AlertCircle className="h-4 w-4 shrink-0" />
                     )}
                     {message.text}
+                  </motion.div>
+                )}
+
+                {/* Match Cards */}
+                {isClosed && (
+                  <motion.div variants={fadeUp} custom={3.5} className="mb-6">
+                    <Card className="p-5 bg-yellow-500/[0.06] border-yellow-500/20">
+                      <div className="flex items-center gap-3">
+                        <Lock className="h-5 w-5 text-yellow-400 shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold text-yellow-400">Predictions Closed</p>
+                          <p className="text-xs text-zinc-400">
+                            Admin has closed predictions for this event. New predictions will not be counted.
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
                   </motion.div>
                 )}
 

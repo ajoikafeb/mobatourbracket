@@ -93,10 +93,21 @@ export async function getOrCreatePredictionUser(username: string): Promise<Predi
 export async function getLeaderboard(eventId: string): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
 
-  const { data: entries, error: entriesError } = await supabase
+  const { data: settings } = await supabase
+    .from("prediction_settings")
+    .select("closed_at")
+    .eq("event_id", eventId)
+    .single();
+  const closedAt = settings?.closed_at || null;
+
+  let query = supabase
     .from("prediction_entries")
     .select("discord_username")
     .eq("event_id", eventId);
+  if (closedAt) {
+    query = query.lt("submitted_at", closedAt);
+  }
+  const { data: entries, error: entriesError } = await query;
   if (entriesError) throw entriesError;
 
   const uniqueUsernames = [...new Set((entries || []).map((e: { discord_username: string }) => e.discord_username))];

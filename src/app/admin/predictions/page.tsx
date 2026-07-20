@@ -16,6 +16,8 @@ import {
   ToggleRight,
   Settings,
   AlertTriangle,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +60,7 @@ export default function AdminPredictionsPage() {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [closingId, setClosingId] = useState<string | null>(null);
 
   const tournamentEvents = events.filter(
     (e) => e.category === "prediction"
@@ -158,6 +161,24 @@ export default function AdminPredictionsPage() {
       setTimeout(() => setMessage(null), 3000);
     }
   }, [deleteTarget, refetch]);
+
+  const handleToggleClose = useCallback(async (eventId: string, currentlyClosed: boolean) => {
+    setClosingId(eventId);
+    try {
+      await upsertPredictionSettings(eventId, {
+        closed_at: currentlyClosed ? null : new Date().toISOString(),
+        enabled: currentlyClosed ? true : undefined,
+      } as Partial<PredictionSettings>);
+      const s = await getPredictionSettings(eventId);
+      if (s) setSettingsMap((prev) => ({ ...prev, [eventId]: s }));
+      setMessage({ type: "success", text: currentlyClosed ? "Predictions reopened." : "Predictions closed." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to toggle predictions." });
+    } finally {
+      setClosingId(null);
+      setTimeout(() => setMessage(null), 3000);
+    }
+  }, []);
 
   if (eventsLoading) {
     return (
@@ -284,6 +305,27 @@ export default function AdminPredictionsPage() {
                         Delete
                       </Button>
                       <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "gap-1.5",
+                          settings?.closed_at
+                            ? "text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                            : "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                        )}
+                        onClick={() => handleToggleClose(event.id, !!settings?.closed_at)}
+                        disabled={closingId === event.id}
+                      >
+                        {closingId === event.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : settings?.closed_at ? (
+                          <Unlock className="h-3.5 w-3.5" />
+                        ) : (
+                          <Lock className="h-3.5 w-3.5" />
+                        )}
+                        {settings?.closed_at ? "Reopen" : "Close"}
+                      </Button>
+                      <Button
                         variant="outline"
                         size="sm"
                         className="gap-1.5"
@@ -296,7 +338,7 @@ export default function AdminPredictionsPage() {
                   </div>
 
                   {settings && !isEditing && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                       <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3 text-center">
                         <p className="text-xs text-zinc-500">Status</p>
                         <p className={cn("text-sm font-semibold", settings.enabled ? "text-green-400" : "text-zinc-400")}>
@@ -317,6 +359,12 @@ export default function AdminPredictionsPage() {
                         <p className="text-xs text-zinc-500">Points</p>
                         <p className={cn("text-sm font-semibold", settings.points_enabled ? "text-green-400" : "text-zinc-400")}>
                           {settings.points_enabled ? "On" : "Off"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3 text-center">
+                        <p className="text-xs text-zinc-500">Predictions</p>
+                        <p className={cn("text-sm font-semibold", settings.closed_at ? "text-red-400" : "text-green-400")}>
+                          {settings.closed_at ? "Closed" : "Open"}
                         </p>
                       </div>
                     </div>
