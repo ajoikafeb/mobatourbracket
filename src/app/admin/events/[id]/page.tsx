@@ -502,9 +502,10 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     try {
                       const url = await uploadEventMedia(file, "banners");
                       updateField("banner", url);
-                    } catch {
-                      setMessage({ type: "error", text: "Banner upload failed." });
-                      setTimeout(() => setMessage(null), 3000);
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Banner upload failed.";
+                      setMessage({ type: "error", text: msg });
+                      setTimeout(() => setMessage(null), 5000);
                     }
                   }}
                 />
@@ -523,9 +524,10 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     try {
                       const url = await uploadEventMedia(file, "thumbnails");
                       updateField("thumbnail", url);
-                    } catch {
-                      setMessage({ type: "error", text: "Thumbnail upload failed." });
-                      setTimeout(() => setMessage(null), 3000);
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Thumbnail upload failed.";
+                      setMessage({ type: "error", text: msg });
+                      setTimeout(() => setMessage(null), 5000);
                     }
                   }}
                 />
