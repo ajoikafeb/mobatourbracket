@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { PredictionSettings, PredictionUser, PredictionEntry, LeaderboardEntry } from "@/lib/prediction-types";
+import type { PredictionSettings, PredictionUser, PredictionEntry, LeaderboardEntry, PredictionEventMatch } from "@/lib/prediction-types";
 
 export async function getPredictionSettings(eventId: string): Promise<PredictionSettings | null> {
   const supabase = createClient();
@@ -198,4 +198,41 @@ export async function calculatePredictionResults(
       .update({ is_correct: isCorrect })
       .eq("id", entry.id);
   }
+}
+
+// ── Prediction Event Matches (junction table) ──────────
+
+export async function getPredictionEventMatches(predictionEventId: string): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("prediction_event_matches")
+    .select("match_id")
+    .eq("prediction_event_id", predictionEventId);
+  if (error) throw error;
+  return (data || []).map((row: { match_id: string }) => row.match_id);
+}
+
+export async function setPredictionEventMatches(
+  predictionEventId: string,
+  matchIds: string[]
+): Promise<void> {
+  const supabase = createClient();
+
+  // Delete all existing
+  await supabase
+    .from("prediction_event_matches")
+    .delete()
+    .eq("prediction_event_id", predictionEventId);
+
+  if (matchIds.length === 0) return;
+
+  // Insert new
+  const rows = matchIds.map((matchId: string) => ({
+    prediction_event_id: predictionEventId,
+    match_id: matchId,
+  }));
+  const { error } = await supabase
+    .from("prediction_event_matches")
+    .insert(rows);
+  if (error) throw new Error(`DB Error: ${error.message} (code: ${error.code})`);
 }

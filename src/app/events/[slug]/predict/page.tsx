@@ -144,7 +144,7 @@ export default function PredictPage({
             <PredictSkeleton />
           ) : !event ? (
             <NotFoundState />
-          ) : !event.prediction_enabled ? (
+          ) : event.category !== "prediction" ? (
             <PredictionDisabledState />
           ) : (
             <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">

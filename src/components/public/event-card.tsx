@@ -73,7 +73,7 @@ export function EventCard({ event, className }: EventCardProps) {
                   {categoryLabel}
                 </span>
               )}
-              {event.prediction_enabled && (
+              {event.category === "prediction" && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-medium text-purple-400 backdrop-blur-sm">
                   <Target className="h-2.5 w-2.5" />
                   Predict

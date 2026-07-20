@@ -36,6 +36,13 @@ export interface PredictionEntry {
   created_at: string;
 }
 
+export interface PredictionEventMatch {
+  id: string;
+  prediction_event_id: string;
+  match_id: string;
+  created_at: string;
+}
+
 export type PredictionStatus = "open" | "locked" | "calculated" | "cancelled";
 
 export interface PredictableMatch {

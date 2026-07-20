@@ -25,7 +25,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { events } = useEvents(true);
 
-  const hasPredictionEvents = events.some((e) => e.prediction_enabled);
+  const hasPredictionEvents = events.some((e) => e.category === "prediction");
 
   const navLinks = [
     { href: "/", label: "Home", icon: Home },

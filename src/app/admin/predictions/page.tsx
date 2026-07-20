@@ -56,7 +56,7 @@ export default function AdminPredictionsPage() {
   const [resettingId, setResettingId] = useState<string | null>(null);
 
   const tournamentEvents = events.filter(
-    (e) => e.category === "tournament" || e.prediction_enabled
+    (e) => e.category === "prediction"
   );
 
   useEffect(() => {

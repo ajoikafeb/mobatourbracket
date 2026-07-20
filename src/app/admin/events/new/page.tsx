@@ -28,8 +28,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { createEvent } from "@/services/event-service";
+import { setPredictionEventMatches } from "@/services/prediction-service";
 import type { EventCategory, EventStatus, RegistrationStatus } from "@/lib/types";
 import { EVENT_CATEGORY_MAP } from "@/lib/types";
+import type { Match } from "@/lib/types";
 
 function generateSlug(title: string): string {
   return title
@@ -122,6 +124,39 @@ export default function NewEventPage() {
   const [publishing, setPublishing] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Prediction event match selection
+  const [tournamentEvents, setTournamentEvents] = useState<{ id: string; title: string }[]>([]);
+  const [sourceEventId, setSourceEventId] = useState("");
+  const [allMatches, setAllMatches] = useState<Match[]>([]);
+  const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+
+  // Load tournament events when category changes to prediction
+  useEffect(() => {
+    if (form.category !== "prediction") return;
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase.from("events").select("id, title").eq("category", "tournament").order("title")
+        .then(({ data }: { data: { id: string; title: string }[] | null }) => {
+          if (data) setTournamentEvents(data);
+        });
+    });
+  }, [form.category]);
+
+  // Load matches when source event is selected
+  useEffect(() => {
+    if (!sourceEventId || form.category !== "prediction") return;
+    setLoadingMatches(true);
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase.from("matches").select("*").order("match_date", { ascending: true })
+        .then(({ data }: { data: Match[] | null }) => {
+          setAllMatches(data || []);
+          setLoadingMatches(false);
+        }).catch(() => setLoadingMatches(false));
+    });
+  }, [sourceEventId, form.category]);
+
   const updateField = useCallback(
     <K extends keyof FormData>(key: K, value: FormData[K]) => {
       setForm((prev) => {
@@ -166,34 +201,48 @@ export default function NewEventPage() {
       setMessage({ type: "error", text: "Title is required." });
       return;
     }
+    if (form.category === "prediction" && selectedMatchIds.length === 0) {
+      setMessage({ type: "error", text: "Select at least one match for prediction." });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
-      await createEvent(buildPayload());
+      const event = await createEvent(buildPayload());
+      if (form.category === "prediction" && selectedMatchIds.length > 0) {
+        await setPredictionEventMatches(event.id, selectedMatchIds);
+      }
       router.push("/admin/events");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to create event.";
       setMessage({ type: "error", text: msg });
       setSaving(false);
     }
-  }, [form, buildPayload, router]);
+  }, [form, buildPayload, selectedMatchIds, router]);
 
   const handlePublish = useCallback(async () => {
     if (!form.title.trim()) {
       setMessage({ type: "error", text: "Title is required." });
       return;
     }
+    if (form.category === "prediction" && selectedMatchIds.length === 0) {
+      setMessage({ type: "error", text: "Select at least one match for prediction." });
+      return;
+    }
     setPublishing(true);
     setMessage(null);
     try {
-      await createEvent(buildPayload(true));
+      const event = await createEvent(buildPayload(true));
+      if (form.category === "prediction" && selectedMatchIds.length > 0) {
+        await setPredictionEventMatches(event.id, selectedMatchIds);
+      }
       router.push("/admin/events");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to publish event.";
       setMessage({ type: "error", text: msg });
       setPublishing(false);
     }
-  }, [form, buildPayload, router]);
+  }, [form, buildPayload, selectedMatchIds, router]);
 
   useEffect(() => {
     if (message) {
@@ -509,6 +558,115 @@ export default function NewEventPage() {
           </Card>
         </motion.div>
 
+        {/* ── Prediction Match Selection (only for prediction category) ── */}
+        {form.category === "prediction" && (
+          <motion.div variants={item}>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="h-5 w-5 text-orange-400" />
+                  Select Matches
+                </CardTitle>
+                <CardDescription>Choose which tournament matches are available for prediction.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-300">Source Tournament</label>
+                  <Select
+                    value={sourceEventId}
+                    onChange={(e) => {
+                      setSourceEventId(e.target.value);
+                      setSelectedMatchIds([]);
+                    }}
+                  >
+                    <option value="">Select a tournament...</option>
+                    {tournamentEvents.map((te) => (
+                      <option key={te.id} value={te.id}>{te.title}</option>
+                    ))}
+                  </Select>
+                </div>
+
+                {sourceEventId && loadingMatches && (
+                  <div className="flex items-center gap-2 py-4 text-sm text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading matches...
+                  </div>
+                )}
+
+                {sourceEventId && !loadingMatches && allMatches.length === 0 && (
+                  <p className="text-sm text-zinc-500 py-4">No matches found. Generate a schedule first.</p>
+                )}
+
+                {allMatches.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-zinc-500">
+                        {selectedMatchIds.length} of {allMatches.length} matches selected
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          if (selectedMatchIds.length === allMatches.length) {
+                            setSelectedMatchIds([]);
+                          } else {
+                            setSelectedMatchIds(allMatches.map((m) => m.id));
+                          }
+                        }}
+                      >
+                        {selectedMatchIds.length === allMatches.length ? "Deselect All" : "Select All"}
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                      {allMatches.map((match) => (
+                        <label
+                          key={match.id}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all",
+                            selectedMatchIds.includes(match.id)
+                              ? "border-orange-500/40 bg-orange-500/10"
+                              : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMatchIds.includes(match.id)}
+                            onChange={() => {
+                              setSelectedMatchIds((prev) =>
+                                prev.includes(match.id)
+                                  ? prev.filter((id) => id !== match.id)
+                                  : [...prev, match.id]
+                              );
+                            }}
+                            className="rounded border-zinc-600 bg-zinc-800 text-orange-500 focus:ring-orange-500/40"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">
+                              {match.team_a || "TBA"} vs {match.team_b || "TBA"}
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                              {match.round} {match.match_date ? `· ${new Date(match.match_date).toLocaleDateString()}` : ""}
+                            </p>
+                          </div>
+                          <span className={cn(
+                            "text-[10px] font-medium px-2 py-0.5 rounded-full",
+                            match.status === "finished" ? "bg-green-500/20 text-green-400" :
+                            match.status === "live" ? "bg-red-500/20 text-red-400" :
+                            "bg-zinc-500/20 text-zinc-400"
+                          )}>
+                            {match.status}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* ── Visibility ──────────────────────── */}
         <motion.div variants={item}>
           <Card className="bg-zinc-900/50 border-zinc-800">
@@ -564,30 +722,6 @@ export default function NewEventPage() {
                     className={cn(
                       "inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200",
                       form.featured ? "translate-x-6" : "translate-x-1"
-                    )}
-                  />
-                </button>
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  <Target className="h-4 w-4 text-zinc-400" />
-                  <div>
-                    <p className="text-sm font-medium text-zinc-200">Predictions</p>
-                    <p className="text-xs text-zinc-500">Enable match predictions for this event.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => updateField("prediction_enabled", !form.prediction_enabled)}
-                  className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40",
-                    form.prediction_enabled ? "bg-orange-500" : "bg-zinc-700"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200",
-                      form.prediction_enabled ? "translate-x-6" : "translate-x-1"
                     )}
                   />
                 </button>

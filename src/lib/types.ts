@@ -102,6 +102,7 @@ export interface Settings {
 
 export type EventCategory =
   | "tournament"
+  | "prediction"
   | "giveaway"
   | "community_night"
   | "poker"
@@ -229,6 +230,7 @@ export interface Announcement {
 
 export const EVENT_CATEGORY_MAP: Record<EventCategory, string> = {
   tournament: "Tournament",
+  prediction: "Prediction",
   giveaway: "Giveaway",
   community_night: "Community Night",
   poker: "Poker",
