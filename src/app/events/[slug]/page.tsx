@@ -333,21 +333,21 @@ function EventContent({ event }: { event: NonNullable<ReturnType<typeof useEvent
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/events/${event.slug}/predictors`}>
                     <Button
-                      size="lg"
+                      size="sm"
                       variant="ghost"
-                      className="gap-2 shrink-0 text-yellow-400 hover:bg-yellow-500/10"
+                      className="gap-1.5 text-yellow-400 hover:bg-yellow-500/10"
                     >
-                      <Trophy className="h-4 w-4" />
+                      <Trophy className="h-3.5 w-3.5" />
                       Predictors
                     </Button>
                   </Link>
                   <Link href={`/events/${event.slug}/predict`}>
                     <Button
-                      size="lg"
+                      size="sm"
                       variant="outline"
-                      className="gap-2 shrink-0 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                      className="gap-1.5 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                     >
-                      <Target className="h-4 w-4" />
+                      <Target className="h-3.5 w-3.5" />
                       Predict Now
                     </Button>
                   </Link>
