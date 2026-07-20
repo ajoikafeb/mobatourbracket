@@ -8,7 +8,6 @@ import {
   getPredictionSettings,
   getPredictionEntries,
   getLeaderboard,
-  getPredictionEventMatches,
 } from "@/services/prediction-service";
 
 export function usePredictionSettings(eventId: string | null) {
@@ -200,13 +199,8 @@ export function usePredictableMatches(eventId: string | null) {
     try {
       const supabase = createClient();
 
-      // Fetch linked match IDs from junction table
-      const linkedMatchIds = await getPredictionEventMatches(eventId).catch(() => []);
-
       const [matchesResult, teamsResult, settingsResult, entriesResult] = await Promise.all([
-        linkedMatchIds.length > 0
-          ? supabase.from("matches").select("*").in("id", linkedMatchIds).order("match_date", { ascending: true })
-          : supabase.from("matches").select("*").order("match_date", { ascending: true }),
+        supabase.from("matches").select("*").order("match_date", { ascending: true }),
         supabase.from("teams").select("*").order("team_name", { ascending: true }),
         getPredictionSettings(eventId).catch(() => null),
         getPredictionEntries(eventId).catch(() => []),
