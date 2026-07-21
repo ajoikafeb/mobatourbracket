@@ -201,7 +201,7 @@ export default function AdminPredictionsPage() {
       const { data: matches } = await supabase
         .from("matches")
         .select("id, winner_id")
-        .in("id", pem.map((r) => r.match_id))
+        .in("id", pem.map((r: { match_id: string }) => r.match_id))
         .not("winner_id", "is", null);
 
       if (!matches || matches.length === 0) {
