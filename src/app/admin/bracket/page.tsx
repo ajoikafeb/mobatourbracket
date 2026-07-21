@@ -72,6 +72,23 @@ export default function AdminBracketPage() {
         const { saveMatchResult } = await import("@/engine/tournament-service");
         const err = await saveMatchResult(supabase, matchId, scoreA, scoreB, winnerId, winnerName, matches);
         if (err) throw err;
+
+        // Auto-calculate prediction results for any prediction events tied to this match
+        if (winnerId) {
+          try {
+            const { data: pem } = await supabase
+              .from("prediction_event_matches")
+              .select("prediction_event_id")
+              .eq("match_id", matchId);
+            if (pem && pem.length > 0) {
+              const { calculatePredictionResults } = await import("@/services/prediction-service");
+              for (const row of pem) {
+                await calculatePredictionResults(row.prediction_event_id, matchId, winnerId).catch(() => {});
+              }
+            }
+          } catch {}
+        }
+
         setMessage("Match saved!");
         setTimeout(() => setMessage(""), 2000);
       } catch (err) {

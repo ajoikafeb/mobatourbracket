@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Lock,
   Unlock,
+  RefreshCw,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
   upsertPredictionSettings,
   exportPredictionsCSV,
   resetPredictions,
+  calculatePredictionResults,
 } from "@/services/prediction-service";
 import type { PredictionSettings } from "@/lib/prediction-types";
 import type { Event } from "@/lib/types";
@@ -61,6 +63,7 @@ export default function AdminPredictionsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [recalculatingId, setRecalculatingId] = useState<string | null>(null);
 
   const tournamentEvents = events.filter(
     (e) => e.category === "prediction"
@@ -180,6 +183,46 @@ export default function AdminPredictionsPage() {
     }
   }, []);
 
+  const handleRecalculate = useCallback(async (eventId: string) => {
+    setRecalculatingId(eventId);
+    try {
+      const supabase = (await import("@/lib/supabase/client")).createClient();
+
+      const { data: pem } = await supabase
+        .from("prediction_event_matches")
+        .select("match_id")
+        .eq("prediction_event_id", eventId);
+      if (!pem || pem.length === 0) {
+        setMessage({ type: "error", text: "No matches found for this event." });
+        setTimeout(() => setMessage(null), 3000);
+        return;
+      }
+
+      const { data: matches } = await supabase
+        .from("matches")
+        .select("id, winner_id")
+        .in("id", pem.map((r) => r.match_id))
+        .not("winner_id", "is", null);
+
+      if (!matches || matches.length === 0) {
+        setMessage({ type: "error", text: "No finished matches with winners found." });
+        setTimeout(() => setMessage(null), 3000);
+        return;
+      }
+
+      for (const match of matches) {
+        await calculatePredictionResults(eventId, match.id, match.winner_id!);
+      }
+
+      setMessage({ type: "success", text: `Calculated results for ${matches.length} match(es).` });
+    } catch {
+      setMessage({ type: "error", text: "Failed to recalculate results." });
+    } finally {
+      setRecalculatingId(null);
+      setTimeout(() => setMessage(null), 3000);
+    }
+  }, []);
+
   if (eventsLoading) {
     return (
       <div className="space-y-6">
@@ -294,6 +337,20 @@ export default function AdminPredictionsPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         )}
                         Reset
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                        onClick={() => handleRecalculate(event.id)}
+                        disabled={recalculatingId === event.id}
+                      >
+                        {recalculatingId === event.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                        Recalc
                       </Button>
                       <Button
                         variant="ghost"
