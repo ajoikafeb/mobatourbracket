@@ -31,7 +31,6 @@ import {
   upsertPredictionSettings,
   exportPredictionsCSV,
   resetPredictions,
-  calculatePredictionResults,
 } from "@/services/prediction-service";
 import type { PredictionSettings } from "@/lib/prediction-types";
 import type { Event } from "@/lib/types";
@@ -188,20 +187,25 @@ export default function AdminPredictionsPage() {
     try {
       const supabase = (await import("@/lib/supabase/client")).createClient();
 
-      const { data: pem } = await supabase
-        .from("prediction_event_matches")
-        .select("match_id")
-        .eq("prediction_event_id", eventId);
-      if (!pem || pem.length === 0) {
-        setMessage({ type: "error", text: "No matches found for this event." });
+      // Get all prediction entries for this event that have a match_id
+      const { data: entries } = await supabase
+        .from("prediction_entries")
+        .select("id, match_id, selected_team_id")
+        .eq("event_id", eventId)
+        .not("match_id", "is", null);
+
+      if (!entries || entries.length === 0) {
+        setMessage({ type: "error", text: "No prediction entries found for this event." });
         setTimeout(() => setMessage(null), 3000);
         return;
       }
 
+      const uniqueMatchIds = [...new Set(entries.map((e: { match_id: string }) => e.match_id))];
+
       const { data: matches } = await supabase
         .from("matches")
         .select("id, winner_id")
-        .in("id", pem.map((r: { match_id: string }) => r.match_id))
+        .in("id", uniqueMatchIds)
         .not("winner_id", "is", null);
 
       if (!matches || matches.length === 0) {
@@ -210,12 +214,23 @@ export default function AdminPredictionsPage() {
         return;
       }
 
-      for (const match of matches) {
-        await calculatePredictionResults(eventId, match.id, match.winner_id!);
+      const winnerMap = new Map(matches.map((m: { id: string; winner_id: string }) => [m.id, m.winner_id]));
+      let updatedCount = 0;
+
+      for (const entry of entries) {
+        const winnerId = winnerMap.get(entry.match_id);
+        if (!winnerId) continue;
+        const isCorrect = entry.selected_team_id === winnerId;
+        await supabase
+          .from("prediction_entries")
+          .update({ is_correct: isCorrect })
+          .eq("id", entry.id);
+        updatedCount++;
       }
 
-      setMessage({ type: "success", text: `Calculated results for ${matches.length} match(es).` });
-    } catch {
+      setMessage({ type: "success", text: `Calculated results for ${updatedCount} prediction(s) across ${matches.length} match(es).` });
+    } catch (e) {
+      console.error("Recalculate error:", e);
       setMessage({ type: "error", text: "Failed to recalculate results." });
     } finally {
       setRecalculatingId(null);
